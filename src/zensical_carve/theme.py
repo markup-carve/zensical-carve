@@ -42,6 +42,7 @@ _CODE = re.compile(
 )
 _ATTR = re.compile(r"""(?P<name>[-\w]+)\s*=\s*"(?P<value>[^"]*)\"""")
 _TASK_ITEM = re.compile(r"<li>(\s*)<input type=\"checkbox\"")
+_INJECTED_MARKUP = re.compile(r"<[a-zA-Z/]")
 
 
 def _attrs(raw: str) -> dict[str, str]:
@@ -92,21 +93,26 @@ def _markdown_code(pre_attrs: dict[str, str], code_attrs: dict[str, str], body: 
 def _dedent(chunk: str) -> str:
     """Left-align an HTML chunk that used to sit inside a `<section>`.
 
-    Carve indents by container depth, so dropping the sections leaves the HTML
-    four or more spaces in - and Python-Markdown reads a four-space indent as a
-    code block, which turned the whole page into one. The indent of the first
-    non-blank line is the section depth, and stripping that much from every
-    line preserves the relative indentation inside the chunk.
+    Carve indents by container depth, and Python-Markdown reads a four-space
+    indent as a code block - so a `<dl>` nested two sections deep becomes a code
+    block showing its own open tag. Whitespace between HTML tags is
+    insignificant, so every line is left-aligned rather than shifted by a common
+    amount: a chunk can open at column 0 and still hold deeper lines, which is
+    exactly the case a common-prefix dedent misses.
+
+    `<pre>` and `<textarea>` are the exceptions, because in a raw-text element
+    the whitespace IS the content. Carve emits neither from its own constructs,
+    but a ```=html raw block can carry either straight through.
     """
-    lines = chunk.split("\n")
-    first = next((line for line in lines if line.strip()), "")
-    indent = len(first) - len(first.lstrip(" "))
-    if not indent:
-        return chunk
-    return "\n".join(
-        line[indent:] if line[:indent].strip() == "" else line.lstrip(" ")
-        for line in lines
-    )
+    out: list[str] = []
+    depth = 0
+    for line in chunk.split("\n"):
+        out.append(line if depth else line.lstrip(" "))
+        for tag in ("pre", "textarea"):
+            depth += len(re.findall(rf"<{tag}\b", line))
+            depth -= len(re.findall(rf"</{tag}\s*>", line))
+        depth = max(0, depth)
+    return "\n".join(out)
 
 
 def adapt(carve_html: str) -> str:
@@ -153,13 +159,24 @@ def adapt(carve_html: str) -> str:
                 )
             )
         else:
-            pieces.append(
-                _markdown_code(
-                    _attrs(match.group("pre_attrs")),
-                    _attrs(match.group("code_attrs")),
-                    match.group("body"),
+            body = match.group("body")
+            if _INJECTED_MARKUP.search(body):
+                # An extension has already put ELEMENTS inside this code block -
+                # code callouts do exactly that, emitting `<b class="callout">`
+                # around the marker. Carve escapes a source `<` to `&lt;`, so a
+                # literal tag here can only be injected markup. Handing it to
+                # Markdown as a fence would print those tags as text, so the
+                # block stays HTML and forfeits the theme's highlighting, which
+                # is the cheaper of the two losses.
+                pieces.append(match.group(0))
+            else:
+                pieces.append(
+                    _markdown_code(
+                        _attrs(match.group("pre_attrs")),
+                        _attrs(match.group("code_attrs")),
+                        body,
+                    )
                 )
-            )
     pieces.append(out[position:])
     out = "".join(_dedent(piece) if not piece.startswith("\n\n") else piece for piece in pieces)
 

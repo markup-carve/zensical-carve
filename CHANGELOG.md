@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- A code block an extension has put markup into stays HTML instead of being
+  handed back as a Markdown fence. Code callouts emit `<b class="callout">`
+  inside the block, and fencing printed those tags as text.
+- Every line of an HTML chunk is left-aligned, not just chunks with a common
+  indent. A `<dl>` two sections deep sat at four spaces, which Python-Markdown
+  reads as a code block - the glossary rendered as its own open tag in a code
+  box. Whitespace inside `<pre>` and `<textarea>` is preserved.
+
 ### Added
 
 - Documented which Carve extensions to enable, as three starting-point sets

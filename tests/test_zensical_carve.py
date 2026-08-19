@@ -220,3 +220,48 @@ def test_convert_can_opt_out_of_theme_adaptation():
     page = convert("# H\n\nx\n", theme=False)
     assert "<h1>H</h1>" in page
     assert "# H {#" not in page
+
+
+def test_a_code_block_holding_injected_markup_stays_html():
+    """Code callouts put `<b class="callout">` inside the code block.
+
+    Carve escapes a source `<` to `&lt;`, so a literal tag in the payload can
+    only have been injected by an extension. Fencing it would print the tags.
+    """
+    out = adapt(
+        '<pre><code class="language-rust">fn main() { '
+        '<b class="callout" data-callout="1">1</b>\n}</code></pre>'
+    )
+    assert '<b class="callout"' in out
+    assert "```rust" not in out
+
+
+def test_an_ordinary_code_block_with_escaped_angle_brackets_still_fences():
+    """`a &lt; b` is source, not markup, and must keep the theme's highlighting."""
+    out = adapt('<pre><code class="language-c">if (a &lt; b) {}</code></pre>')
+    assert "```c" in out
+    assert "if (a < b) {}" in out
+
+
+def test_a_deeply_indented_tag_is_left_aligned_even_when_the_chunk_starts_at_zero():
+    """A four-space indent is a code block, and a common-prefix dedent misses it.
+
+    The chunk opens at column 0 with a `<p>`, so there is no common prefix to
+    strip - but the `<dl>` two sections deep would still render as a code block
+    showing its own open tag.
+    """
+    out = adapt('<section id="a">\n<p>x</p>\n    <dl class="glossary">\n  <dt>t</dt>\n</dl>\n</section>')
+    assert "\n<dl class=\"glossary\">" in out
+    assert "    <dl" not in out
+
+
+def test_whitespace_inside_pre_survives_the_dedent():
+    """Indentation is insignificant between tags and significant inside <pre>."""
+    out = adapt('<section id="a">\n  <pre><code>def f():\n    return 1\n</code></pre>\n</section>')
+    assert "    return 1" in out
+
+
+def test_whitespace_inside_textarea_survives_the_dedent():
+    """A raw-text element keeps its whitespace, and a raw HTML block can hold one."""
+    out = adapt('<section id="a">\n  <textarea>\n    value\n  </textarea>\n</section>')
+    assert "\n    value" in out
