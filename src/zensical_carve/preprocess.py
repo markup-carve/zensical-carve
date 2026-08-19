@@ -27,6 +27,7 @@ from pathlib import Path
 from typing import Iterable, Sequence
 
 from . import CarveError, render
+from .theme import adapt
 
 __all__ = ["GENERATED_MARKER", "convert", "convert_tree", "clean_tree", "main"]
 
@@ -50,10 +51,24 @@ def _split_front_matter(source: str) -> tuple[str, str]:
     return match.group(1), source[match.end() :]
 
 
-def convert(source: str, *, extensions: Sequence[str] | None = None) -> str:
-    """Render one Carve document into the text of a Markdown page."""
+def convert(
+    source: str,
+    *,
+    extensions: Sequence[str] | None = None,
+    theme: bool = True,
+) -> str:
+    """Render one Carve document into the text of a Markdown page.
+
+    With ``theme`` (the default), headings and code blocks are handed back to
+    Zensical as Markdown so the table of contents, the permalinks and the
+    highlighting pipeline work - see :mod:`zensical_carve.theme`. Pass
+    ``theme=False`` for the raw HTML, which is higher fidelity and less
+    integrated.
+    """
     front_matter, _ = _split_front_matter(source)
     html = render(source, extensions=extensions)
+    if theme:
+        html = adapt(html)
 
     head = ["---"]
     if front_matter:
@@ -83,6 +98,7 @@ def convert_tree(
     *,
     extensions: Sequence[str] | None = None,
     force: bool = False,
+    theme: bool = True,
 ) -> list[Path]:
     """Render every ``.crv`` under ``docs_dir`` to a sibling ``.md``.
 
@@ -101,7 +117,11 @@ def convert_tree(
                 file=sys.stderr,
             )
             continue
-        text = convert(source_path.read_text(encoding="utf-8"), extensions=extensions)
+        text = convert(
+            source_path.read_text(encoding="utf-8"),
+            extensions=extensions,
+            theme=theme,
+        )
         target.write_text(text, encoding="utf-8")
         written.append(target)
     return written
@@ -149,6 +169,12 @@ def main(argv: Sequence[str] | None = None) -> int:
         action="store_true",
         help="overwrite a .md this tool did not generate",
     )
+    prepare.add_argument(
+        "--raw-html",
+        action="store_true",
+        help="emit Carve's HTML verbatim, without handing headings and code"
+        " blocks back to the theme",
+    )
 
     clean = sub.add_parser("clean", help="delete the generated .md pages")
     _add_common(clean)
@@ -160,6 +186,9 @@ def main(argv: Sequence[str] | None = None) -> int:
         help="enable a Carve extension; repeat for several",
     )
     build.add_argument("--force", action="store_true", help="see `prepare --force`")
+    build.add_argument(
+        "--raw-html", action="store_true", help="see `prepare --raw-html`"
+    )
     build.add_argument(
         "rest", nargs=argparse.REMAINDER, help="arguments passed to `zensical build`"
     )
@@ -177,7 +206,10 @@ def main(argv: Sequence[str] | None = None) -> int:
 
     try:
         written = convert_tree(
-            docs_dir, extensions=args.extensions, force=args.force
+            docs_dir,
+            extensions=args.extensions,
+            force=args.force,
+            theme=not args.raw_html,
         )
     except CarveError as error:
         print(f"zensical-carve: {error}", file=sys.stderr)

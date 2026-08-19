@@ -36,6 +36,8 @@ title: A whole Carve page
 
 # Whole page mode
 
+## A second heading, so the table of contents has something to hold
+
 | Engine | Language |
 |--------|----------|
 | carve-rs | Rust |
@@ -85,8 +87,15 @@ def main() -> int:
             _fail("Markdown claimed the block - `*` must be strong in Carve, not emphasis")
 
         whole = (site / "site" / "whole" / "index.html").read_text(encoding="utf-8")
-        if "<h1>Whole page mode</h1>" not in whole:
+        if "Whole page mode" not in whole:
             _fail("the whole page did not render")
+        # The four things a raw-HTML body loses, each measured on a real build
+        # before the theme adapter existed.
+        anchors = set(re.findall(r'href="(#[^"]+)"', whole))
+        if len(anchors) < 2:
+            _fail(f"the table of contents is empty: {anchors}")
+        if "headerlink" not in whole:
+            _fail("headings have no permalink")
         if "<td>carve-rs</td>" not in whole:
             _fail("the Carve table did not survive into the page")
         title = re.search(r"<title>(.*?)</title>", whole, re.S)

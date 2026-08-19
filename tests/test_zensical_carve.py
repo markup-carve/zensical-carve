@@ -84,7 +84,7 @@ def test_generated_page_lifts_the_carve_front_matter():
     assert meta["title"] == "Lifted"
     assert meta["tags"] == ["a", "b"]
     assert meta["zensical_carve"] == "generated"
-    assert "<h1>Body</h1>" in page
+    assert "# Body {#Body}" in page
     # The front matter must not also appear in the body.
     assert "title: Lifted" in page.split("---\n", 2)[1]
     assert page.count("title: Lifted") == 1
@@ -98,7 +98,7 @@ def test_convert_tree_writes_a_sibling_page(tmp_path):
     written = convert_tree(docs)
 
     assert written == [docs / "guide" / "page.md"]
-    assert "<h1>Page</h1>" in written[0].read_text(encoding="utf-8")
+    assert "# Page {#Page}" in written[0].read_text(encoding="utf-8")
 
 
 def test_convert_tree_refuses_to_clobber_a_hand_written_page(tmp_path, capsys):
@@ -136,7 +136,7 @@ def test_convert_tree_updates_its_own_output(tmp_path):
     written = convert_tree(docs)
 
     assert written == [docs / "page.md"]
-    assert "<h1>Two</h1>" in (docs / "page.md").read_text(encoding="utf-8")
+    assert "# Two {#Two}" in (docs / "page.md").read_text(encoding="utf-8")
 
 
 def test_clean_tree_removes_only_generated_pages(tmp_path):
@@ -152,3 +152,71 @@ def test_clean_tree_removes_only_generated_pages(tmp_path):
     assert removed == [docs / "generated.md"]
     assert (docs / "kept.md").exists()
     assert GENERATED_MARKER not in (docs / "kept.md").read_text(encoding="utf-8")
+
+
+# --- theme adaptation ------------------------------------------------------
+#
+# These pin the four flaws a real build showed, each measured before the
+# adapter existed: no table of contents, no permalinks, no code title or copy
+# button, and a task list rendered with both a bullet and a checkbox.
+
+from zensical_carve.theme import adapt  # noqa: E402
+
+
+def test_headings_become_markdown_so_the_toc_can_see_them():
+    out = adapt('<section id="Intro">\n  <h1>Intro</h1>\n  <p>x</p>\n</section>\n')
+    assert "# Intro {#Intro}" in out
+    assert "<h1>" not in out
+
+
+def test_heading_keeps_its_own_id_and_classes():
+    out = adapt('<section id="s"><h3 id="own" class="demo">T</h3></section>')
+    assert "### T {#own .demo}" in out
+
+
+def test_code_becomes_a_fence_with_the_title_the_theme_renders():
+    out = adapt('<pre title="render.py"><code class="language-python">x = 1\n</code></pre>')
+    assert '```python title="render.py"' in out
+    assert "x = 1" in out
+    assert "<pre" not in out
+
+
+def test_code_fence_outgrows_a_backtick_run_in_the_payload():
+    out = adapt("<pre><code>a ``` b</code></pre>")
+    assert "````" in out
+
+
+def test_code_entities_are_unescaped_back_to_source():
+    out = adapt('<pre><code class="language-python">a &lt; b &amp;&amp; c</code></pre>')
+    assert "a < b && c" in out
+
+
+def test_html_chunks_are_left_aligned():
+    """Carve indents by section depth, and a four-space indent is a code block."""
+    out = adapt('<section id="a">\n  <h2>H</h2>\n    <p>deep</p>\n</section>\n')
+    assert "\n<p>deep</p>" in out or out.startswith("<p>deep</p>")
+    assert "\n    <p>deep</p>" not in out
+
+
+def test_task_items_get_the_classes_the_theme_styles():
+    out = adapt('<ul>\n  <li><input type="checkbox" checked disabled> a</li>\n</ul>')
+    assert 'class="task-list"' in out
+    assert 'class="task-list-item"' in out
+
+
+def test_everything_else_survives_untouched():
+    source = (
+        '<aside class="admonition note"><p class="admonition-title">T</p></aside>\n'
+        "<dl><dt>a</dt><dd>b</dd></dl>\n"
+        "<table><caption>c</caption></table>\n"
+        "<p><u>u</u> <mark>m</mark> <sub>2</sub></p>\n"
+    )
+    out = adapt(source)
+    for fragment in ("admonition note", "<dl>", "<caption>c</caption>", "<u>u</u>", "<mark>m</mark>"):
+        assert fragment in out
+
+
+def test_convert_can_opt_out_of_theme_adaptation():
+    page = convert("# H\n\nx\n", theme=False)
+    assert "<h1>H</h1>" in page
+    assert "# H {#" not in page

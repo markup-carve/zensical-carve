@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Whole `.crv` pages now take part in the theme: the table of contents is
+  populated, headings carry permalinks, code blocks get the theme's
+  highlighting, copy button and filename bar, and task lists no longer render a
+  bullet beside the checkbox. Headings and code blocks are emitted as Markdown
+  for Zensical to handle; everything else stays as Carve's HTML. `--raw-html`
+  restores the previous behavior.
+
 ## [0.1.0]
 
 ### Added

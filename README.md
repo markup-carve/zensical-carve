@@ -54,11 +54,27 @@ or in one step:
 zensical-carve build
 ```
 
-`prepare` writes a Markdown page beside each `.crv` whose body is the rendered
-HTML. That is not a trick played on Markdown - Python-Markdown passes a
-block-level raw HTML through untouched - it is what puts the page into
-Zensical's own pipeline, so front matter, navigation, search indexing and the
-table of contents all work as they do for any other page.
+`prepare` writes a Markdown page beside each `.crv`. Most of the body is the
+rendered HTML - Python-Markdown passes a block-level raw HTML through untouched
+- but **headings and code blocks are handed back to Zensical as Markdown**, and
+that part is not cosmetic. A page whose body is HTML all the way down builds
+fine and then behaves wrong:
+
+| | body is all HTML | headings and code handed back |
+| --- | --- | --- |
+| table of contents | empty | complete |
+| heading permalinks | none | on every heading |
+| code syntax colors, copy button | none | the theme's own |
+| code block title | invisible `title=` attribute | the theme's filename bar |
+| task lists | bullet *and* checkbox | the theme's checkbox |
+
+Everything else stays as Carve's HTML, deliberately. Carve can render a whole
+page to Markdown, but lossily - an admonition comes out as a bold paragraph
+with the container gone - so converting the whole page would trade this set of
+flaws for a worse one. Admonitions, definition lists, tables with captions and
+every inline mark keep their fidelity.
+
+Pass `--raw-html` if you want the unadapted HTML anyway.
 
 Carve front matter is lifted rather than rendered:
 
@@ -82,7 +98,7 @@ front matter in Markdown.
 | `zensical-carve clean` | delete the generated pages, and only those |
 
 Options: `--docs-dir` (default `docs`), `--extension NAME` (repeatable, enables
-a Carve extension), `--force`.
+a Carve extension), `--force`, `--raw-html`.
 
 A generated page carries `zensical_carve: generated` in its front matter. That
 marker is what `clean` deletes on, and what stops `prepare` from overwriting a
