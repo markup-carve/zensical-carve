@@ -118,13 +118,91 @@ point `--docs-dir` at a staging copy.
 
 ## Which Carve features work
 
-All of them: rendering goes through [`carve-lang`][carve-lang], the PyO3 binding
-over the Rust engine, so a page here renders exactly as `carve` on the command
-line renders it. Carve extensions are off unless you enable them:
+Core Carve works out of the box: rendering goes through [`carve-lang`][carve-lang],
+the PyO3 binding over the Rust engine, so a page here renders exactly as `carve`
+on the command line renders it.
+
+Carve's Tier-2 and Tier-3 extensions are **off unless you enable them**, which is
+the spec's own default and not a choice this plugin makes. Which ones you want is
+a project question, so nothing is turned on for you:
 
 ```bash
-zensical-carve prepare --extension citations --extension footnotes
+zensical-carve prepare --extension fenced-render --extension details
 ```
+
+`carve.extensions()` lists all 32 names. The sets below are starting points.
+
+### The Material-parity set
+
+What a project migrating from Material for MkDocs will expect to keep working,
+because Material has the equivalent on by default:
+
+```bash
+--extension fenced-render --extension details --extension tabs \
+--extension math-block --extension semantic-span
+```
+
+| you had | enable | note |
+| --- | --- | --- |
+| `pymdownx.superfences` mermaid | `fenced-render` | see the collision table |
+| `pymdownx.details` | `details` | renders `<details><summary>` |
+| `pymdownx.tabbed` | `tabs` | see the collision table |
+| `pymdownx.arithmatex` | `math-block` | |
+| `pymdownx.keys` | *nothing yet* | markup-carve/carve#1441 |
+
+Everything else Material gives you is already core Carve and needs no flag:
+admonitions, task lists, footnotes, definition lists, abbreviations, attributes,
+highlight, strikethrough, superscript and subscript, and includes.
+
+### The diagrams set
+
+Carve draws eight diagram languages, each a `FencedRender` preset. `d2` is
+included - the language Zensical tracks as a change request in
+zensical/backlog#29:
+
+```bash
+--extension fenced-render --extension fenced-render-d2 \
+--extension fenced-render-graphviz --extension fenced-render-plantuml \
+--extension fenced-render-vega-lite --extension fenced-render-wavedrom \
+--extension fenced-render-chart --extension fenced-render-abc
+```
+
+`fenced-render` alone covers ` ```mermaid `. The others each claim their own
+fence word.
+
+### The reference-document set
+
+For handbooks and specifications rather than product docs:
+
+```bash
+--extension citations --extension glossary --extension index \
+--extension heading-numbers --extension list-table --extension wikilinks \
+--extension heading-reference --extension code-callouts
+```
+
+### Collisions with Zensical, measured
+
+Three extensions do something Zensical already does, so enabling them duplicates
+rather than adds:
+
+| extension | what happens | verdict |
+| --- | --- | --- |
+| `heading-permalinks` | Carve adds a `¶` anchor, and Zensical's `toc.permalink` already added one | **do not enable** - you get two |
+| `toc` / `table-of-contents` | renders a `<nav>` into the page body; the theme's sidebar table of contents is separate and already populated | enable only if you want a second, in-body one |
+| `tabs` | emits `<div class="tabs">` with radio inputs and Carve's own class names, which Material's tab CSS does not style | works, needs your own CSS |
+
+And one that lines up better than expected: ` ```mermaid ` under `fenced-render`
+emits `<pre class="mermaid">`, which is what Zensical's own mermaid fence emits
+too (one element shallower - Zensical wraps the payload in `<code>`). So a site
+that already has mermaid running picks up Carve's mermaid blocks with no extra
+configuration.
+
+### Emoji is not an extension
+
+`:smile:` parsing is core and on by default, but the map from a name to a glyph
+is a render option rather than an extension, and **this plugin does not expose it
+yet**. Until it does, `:smile:` renders as its own source text. Material ships
+twemoji enabled, so this is the one default a migrating project will notice.
 
 ## Why there is no Zensical module
 

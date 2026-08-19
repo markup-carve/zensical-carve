@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Documented which Carve extensions to enable, as three starting-point sets
+  (Material parity, diagrams, reference documents), plus the three that collide
+  with something Zensical already does. Nothing is enabled for you: which
+  extensions a project wants is a project decision, and off-by-default is the
+  spec's own rule for Tier-2 and Tier-3.
+
 ### Fixed
 
 - Whole `.crv` pages now take part in the theme: the table of contents is
