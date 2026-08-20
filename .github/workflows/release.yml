@@ -1,0 +1,158 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+  # So the whole path can be exercised before a tag is spent. A dispatched run
+  # builds and gates; it never publishes, because `publish` needs a tag.
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build distributions
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: The tag matches the packaged version
+        if: startsWith(github.ref, 'refs/tags/')
+        run: |
+          tag="${GITHUB_REF_NAME#v}"
+          version="$(grep -m1 '^version = ' pyproject.toml | cut -d'"' -f2)"
+          if [ "$tag" != "$version" ]; then
+            echo "tag ${GITHUB_REF_NAME} does not match project version ${version}" >&2
+            exit 1
+          fi
+          module="$(grep -m1 '^__version__ = ' src/zensical_carve/__init__.py | cut -d'"' -f2)"
+          if [ "$tag" != "$module" ]; then
+            echo "tag ${GITHUB_REF_NAME} does not match __version__ ${module}" >&2
+            exit 1
+          fi
+
+      # PyPI refuses a distribution whose dependencies point at a URL. The
+      # upload would fail anyway; failing here says why, and says it before the
+      # tag is spent.
+      - name: No direct-URL dependencies
+        run: |
+          if grep -qE '"[^"]+@ git\+' pyproject.toml; then
+            echo "pyproject.toml still has a git dependency; PyPI rejects direct URLs." >&2
+            exit 1
+          fi
+
+      - name: Build
+        run: |
+          python -m pip install --upgrade build
+          python -m build
+
+      - name: Check distribution metadata
+        run: |
+          python -m pip install --upgrade twine
+          python -m twine check --strict dist/*
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: dist/
+
+  # THE ONLY JOB THAT ASKS WHETHER THE ARTIFACT WORKS.
+  #
+  # Everything above is paperwork: a tag that matches two files, metadata that
+  # parses, a wheel that built. None of it renders a page. The sibling binding
+  # carve-py learned this the expensive way and gates its wheels through the
+  # corpus for the same reason - a check that cannot fail is worth nothing on
+  # the one path that cannot be undone, because PyPI indexes within minutes and
+  # a yank is itself a public event.
+  #
+  # It installs the BUILT WHEEL into a clean virtualenv outside the checkout and
+  # builds a real Zensical site with it. A run from the source tree would
+  # exercise the repository rather than the artifact, which is exactly the
+  # difference that matters here: a module left out of the wheel passes every
+  # test in the checkout.
+  gate:
+    name: A real site builds from the built wheel
+    runs-on: ubuntu-latest
+    needs: [build]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist/
+
+      - name: Install the wheel, and only the wheel
+        run: |
+          python -m venv /tmp/gate
+          /tmp/gate/bin/python -m pip install --upgrade pip
+          /tmp/gate/bin/python -m pip install dist/*.whl zensical
+
+      - name: The import resolves into the installed artifact
+        run: |
+          /tmp/gate/bin/python - <<'PY'
+          import pathlib, sys, zensical_carve
+          here = pathlib.Path(zensical_carve.__file__).resolve()
+          if "site-packages" not in here.parts:
+              sys.exit(f"zensical_carve imported from {here}, not the installed wheel")
+          print(f"zensical_carve {zensical_carve.__version__} from {here}")
+          PY
+
+      - name: Build a site through both seams
+        run: PATH=/tmp/gate/bin:$PATH /tmp/gate/bin/python tests/e2e_build.py
+
+  publish:
+    name: Publish to PyPI
+    runs-on: ubuntu-latest
+    needs: [build, gate]
+    if: startsWith(github.ref, 'refs/tags/')
+    permissions:
+      id-token: write
+    environment:
+      name: pypi
+      url: https://pypi.org/p/zensical-carve
+    steps:
+      # The secrets context is not readable from a step-level `if`, so the path
+      # is decided here. This step only reports whether the secret is set; the
+      # token reaches no other step, and in particular no third-party action.
+      - name: Decide the publish path
+        id: auth
+        env:
+          PYPI_API_TOKEN: ${{ secrets.PYPI_API_TOKEN }}
+        run: |
+          if [ -n "$PYPI_API_TOKEN" ]; then
+            echo "mode=token" >> "$GITHUB_OUTPUT"
+          else
+            echo "mode=oidc" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist/
+
+      # The API token is the bootstrap path only. Once the project exists on
+      # PyPI, configure a trusted publisher there and delete the secret; the
+      # step below then takes over and no credential is stored anywhere.
+      - name: Publish to PyPI (API token)
+        if: steps.auth.outputs.mode == 'token'
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          packages-dir: dist/
+          password: ${{ secrets.PYPI_API_TOKEN }}
+
+      - name: Publish to PyPI (Trusted Publishing)
+        if: steps.auth.outputs.mode == 'oidc'
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          packages-dir: dist/
