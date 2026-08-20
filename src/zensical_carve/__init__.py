@@ -20,7 +20,8 @@ a non-``.md`` file into the output verbatim, so a ``.crv`` page has to become a
 
 from __future__ import annotations
 
-from typing import Any, Sequence
+import functools
+from typing import Any, Mapping, Sequence
 
 __all__ = ["__version__", "CarveError", "fence", "render"]
 
@@ -31,7 +32,12 @@ class CarveError(RuntimeError):
     """Raised when Carve source cannot be rendered."""
 
 
-def render(source: str, *, extensions: Sequence[str] | None = None) -> str:
+def render(
+    source: str,
+    *,
+    extensions: Sequence[str] | None = None,
+    symbols: Mapping[str, str] | None = None,
+) -> str:
     """Render Carve source to HTML.
 
     Args:
@@ -39,6 +45,10 @@ def render(source: str, *, extensions: Sequence[str] | None = None) -> str:
         extensions: Optional Carve extension names. An empty sequence and
             ``None`` are different: ``None`` means "use the engine default",
             an empty sequence means "no extensions".
+        symbols: Optional map from a `:name:` symbol to what it renders as.
+            The engine substitutes the value RAW, so a value carrying markup
+            reaches the page as markup - which is what the twemoji mode in
+            :mod:`zensical_carve.symbols` relies on.
 
     Returns:
         The rendered HTML.
@@ -54,10 +64,14 @@ def render(source: str, *, extensions: Sequence[str] | None = None) -> str:
             "install zensical-carve with its dependencies"
         ) from error
 
+    options: dict[str, Any] = {}
+    if extensions is not None:
+        options["extensions"] = list(extensions)
+    if symbols:
+        options["symbols"] = dict(symbols)
+
     try:
-        if extensions is None:
-            return carve.to_html(source)
-        return carve.to_html_with_extensions(source, list(extensions))
+        return carve.to_html(source, **options)
     except Exception as error:
         raise CarveError(f"Carve refused the document: {error}") from error
 
@@ -85,5 +99,29 @@ def fence(
     Note the DOT before ``fence``. Zensical resolves these symbols with
     ``rsplit(".", 1)``, so the ``module:function`` spelling that works in some
     other tools raises a ``ValueError`` during config parsing here.
+
+    Extensions and symbols come from the ``[tool.zensical-carve]`` table, the
+    same one the whole-page path reads, so a block and a page render alike.
+    There is nowhere else they could come from: superfences hands a fence its
+    own options, and the fence line of a Carve block carries none.
     """
-    return render(source)
+    settings, symbol_map = _runtime()
+    return render(source, extensions=settings.extensions, symbols=symbol_map)
+
+
+@functools.lru_cache(maxsize=1)
+def _runtime() -> tuple["config.Settings", Mapping[str, str] | None]:
+    """The configuration table and its symbol map, built once per process.
+
+    A build calls the fence for every Carve block on every page, and the emoji
+    map is twenty thousand entries, so neither is rebuilt per call. The file
+    cannot change underneath a build - Zensical has already parsed the same
+    file to know the fence exists.
+    """
+    from . import config, symbols as symbol_module
+
+    try:
+        settings = config.load()
+    except config.ConfigError as error:
+        raise CarveError(str(error)) from error
+    return settings, symbol_module.build(settings.emoji, settings.symbols)

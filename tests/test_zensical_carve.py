@@ -9,17 +9,22 @@ overwrites a page it did not write.
 
 from __future__ import annotations
 
+import sys
 import textwrap
+from pathlib import Path
 
 import pytest
 import yaml
 
-from zensical_carve import CarveError, fence, render
+from zensical_carve import CarveError, config, fence, render, symbols
+from zensical_carve import preprocess
 from zensical_carve.preprocess import (
     GENERATED_MARKER,
+    SOURCE_KEY,
     clean_tree,
     convert,
     convert_tree,
+    main,
 )
 
 
@@ -95,10 +100,11 @@ def test_convert_tree_writes_a_sibling_page(tmp_path):
     (docs / "guide").mkdir(parents=True)
     (docs / "guide" / "page.crv").write_text("# Page\n", encoding="utf-8")
 
-    written = convert_tree(docs)
+    outcome = convert_tree(docs)
 
-    assert written == [docs / "guide" / "page.md"]
-    assert "# Page {#Page}" in written[0].read_text(encoding="utf-8")
+    assert outcome.written == [docs / "guide" / "page.md"]
+    assert outcome.failed == []
+    assert "# Page {#Page}" in outcome.written[0].read_text(encoding="utf-8")
 
 
 def test_convert_tree_refuses_to_clobber_a_hand_written_page(tmp_path, capsys):
@@ -107,9 +113,10 @@ def test_convert_tree_refuses_to_clobber_a_hand_written_page(tmp_path, capsys):
     (docs / "page.crv").write_text("# From Carve\n", encoding="utf-8")
     (docs / "page.md").write_text("# Hand written\n", encoding="utf-8")
 
-    written = convert_tree(docs)
+    outcome = convert_tree(docs)
 
-    assert written == []
+    assert outcome.written == []
+    assert outcome.skipped == [docs / "page.md"]
     assert (docs / "page.md").read_text(encoding="utf-8") == "# Hand written\n"
     assert "skipping" in capsys.readouterr().err
 
@@ -120,9 +127,9 @@ def test_convert_tree_force_overwrites(tmp_path):
     (docs / "page.crv").write_text("# From Carve\n", encoding="utf-8")
     (docs / "page.md").write_text("# Hand written\n", encoding="utf-8")
 
-    written = convert_tree(docs, force=True)
+    outcome = convert_tree(docs, force=True)
 
-    assert written == [docs / "page.md"]
+    assert outcome.written == [docs / "page.md"]
     assert "From Carve" in (docs / "page.md").read_text(encoding="utf-8")
 
 
@@ -133,9 +140,9 @@ def test_convert_tree_updates_its_own_output(tmp_path):
     convert_tree(docs)
     (docs / "page.crv").write_text("# Two\n", encoding="utf-8")
 
-    written = convert_tree(docs)
+    outcome = convert_tree(docs)
 
-    assert written == [docs / "page.md"]
+    assert outcome.written == [docs / "page.md"]
     assert "# Two {#Two}" in (docs / "page.md").read_text(encoding="utf-8")
 
 
@@ -265,3 +272,306 @@ def test_whitespace_inside_textarea_survives_the_dedent():
     """A raw-text element keeps its whitespace, and a raw HTML block can hold one."""
     out = adapt('<section id="a">\n  <textarea>\n    value\n  </textarea>\n</section>')
     assert "\n    value" in out
+
+
+# --- configuration ---------------------------------------------------------
+#
+# The table is read from the site's own configuration file. Zensical ignores a
+# table it does not know - measured on 0.0.56, which builds a site whose
+# zensical.toml carries [tool.zensical-carve] without a warning - so the
+# settings can live next to the rest of the site's configuration.
+
+
+def _write(path, text):
+    path.write_text(textwrap.dedent(text).lstrip(), encoding="utf-8")
+    return path
+
+
+def test_config_is_read_from_zensical_toml(tmp_path):
+    _write(
+        tmp_path / "zensical.toml",
+        """
+        [project]
+        site_name = "Site"
+
+        [tool.zensical-carve]
+        extensions = ["details", "tabs"]
+        emoji = "unicode"
+        docs-dir = "pages"
+        """,
+    )
+
+    settings = config.load(start=tmp_path)
+
+    assert settings.extensions == ("details", "tabs")
+    assert settings.emoji == "unicode"
+    assert settings.docs_dir == Path("pages")
+    assert settings.source == tmp_path / "zensical.toml"
+
+
+def test_config_falls_back_to_pyproject(tmp_path):
+    _write(tmp_path / "zensical.toml", '[project]\nsite_name = "Site"\n')
+    _write(
+        tmp_path / "pyproject.toml",
+        """
+        [tool.zensical-carve]
+        extensions = ["details"]
+        """,
+    )
+
+    settings = config.load(start=tmp_path)
+
+    assert settings.extensions == ("details",)
+    assert settings.source == tmp_path / "pyproject.toml"
+
+
+def test_config_absent_is_the_default_not_an_error(tmp_path):
+    settings = config.load(start=tmp_path)
+
+    assert settings == config.Settings()
+    assert settings.source is None
+
+
+def test_config_rejects_an_unknown_key(tmp_path):
+    _write(
+        tmp_path / "zensical.toml",
+        """
+        [tool.zensical-carve]
+        extenshuns = ["details"]
+        """,
+    )
+
+    with pytest.raises(config.ConfigError) as error:
+        config.load(start=tmp_path)
+
+    assert "extenshuns" in str(error.value)
+    assert "extensions" in str(error.value)
+
+
+def test_config_rejects_a_wrong_type(tmp_path):
+    _write(
+        tmp_path / "zensical.toml",
+        """
+        [tool.zensical-carve]
+        extensions = "details"
+        """,
+    )
+
+    with pytest.raises(config.ConfigError):
+        config.load(start=tmp_path)
+
+
+def test_config_symbols_inline_and_from_a_file(tmp_path):
+    (tmp_path / "symbols.json").write_text('{"crab": "\\ud83e\\udd80"}', encoding="utf-8")
+    _write(
+        tmp_path / "zensical.toml",
+        """
+        [tool.zensical-carve]
+        symbols = "symbols.json"
+        """,
+    )
+    assert config.load(start=tmp_path).symbols == {"crab": "🦀"}
+
+    _write(
+        tmp_path / "zensical.toml",
+        """
+        [tool.zensical-carve.symbols]
+        crab = "🦀"
+        """,
+    )
+    assert config.load(start=tmp_path).symbols == {"crab": "🦀"}
+
+
+def test_merge_keeps_a_setting_a_flag_did_not_touch():
+    """An unpassed store_true flag arrives as False and must not turn a key off."""
+    settings = config.Settings(raw_html=True, extensions=("details",))
+
+    merged = config.merge(settings, raw_html=False, extensions=None, emoji=None)
+
+    assert merged.raw_html is True
+    assert merged.extensions == ("details",)
+
+
+def test_merge_lets_a_flag_win():
+    settings = config.Settings(extensions=("details",))
+
+    assert config.merge(settings, extensions=("tabs",)).extensions == ("tabs",)
+
+
+# --- symbols ---------------------------------------------------------------
+
+
+def test_symbol_map_renders_a_shortcode():
+    symbol_map = symbols.emoji_map("unicode")
+    if not symbol_map:  # pragma: no cover - zensical is an optional dependency
+        pytest.skip("zensical is not installed, so there is no emoji index")
+
+    assert symbol_map["smile"] == "😄"
+    assert render("Hi :smile:\n", symbols=symbol_map).count("😄") == 1
+
+
+def test_twemoji_mode_emits_the_element_zensical_emits():
+    symbol_map = symbols.emoji_map("twemoji")
+    if not symbol_map:  # pragma: no cover
+        pytest.skip("zensical is not installed, so there is no emoji index")
+
+    element = symbol_map["smile"]
+    assert element.startswith('<img alt="😄" class="twemoji"')
+    assert element.endswith('title=":smile:" />')
+    # The engine substitutes a symbol RAW, which is what carries the element
+    # through to the page instead of escaping it into visible text.
+    assert element in render("Hi :smile:\n", symbols=symbol_map)
+
+
+def test_symbol_map_is_empty_when_asked_for_nothing():
+    assert symbols.emoji_map("none") == {}
+    assert symbols.build("none") is None
+
+
+def test_project_symbols_win_over_the_emoji_set():
+    built = symbols.build("unicode", {"smile": "SMILE"})
+
+    assert built is not None
+    assert built["smile"] == "SMILE"
+
+
+# --- diagnostics -----------------------------------------------------------
+
+
+def test_a_failing_page_names_itself_and_the_others_are_still_written(tmp_path):
+    docs = tmp_path / "docs"
+    docs.mkdir()
+    (docs / "good.crv").write_text("# Good\n", encoding="utf-8")
+    (docs / "bad.crv").write_bytes(b"\xff\xfe not utf-8")
+
+    outcome = convert_tree(docs)
+
+    assert outcome.written == [docs / "good.md"]
+    assert [path for path, _ in outcome.failed] == [docs / "bad.crv"]
+
+
+def test_generated_page_records_its_source(tmp_path):
+    docs = tmp_path / "docs"
+    docs.mkdir()
+    (docs / "page.crv").write_text("# Page\n", encoding="utf-8")
+
+    convert_tree(docs)
+    front_matter = yaml.safe_load(
+        (docs / "page.md").read_text(encoding="utf-8").split("---")[1]
+    )
+
+    assert front_matter[SOURCE_KEY] == (docs / "page.crv").as_posix()
+
+
+def test_cli_reports_a_failure_with_the_file_and_exits_one(tmp_path, capsys, monkeypatch):
+    docs = tmp_path / "docs"
+    docs.mkdir()
+    (docs / "page.crv").write_text("# Page\n", encoding="utf-8")
+    monkeypatch.chdir(tmp_path)
+
+    code = main(["prepare", "--extension", "no-such-extension-exists"])
+
+    assert code == 1
+    assert "page.crv" in capsys.readouterr().err
+
+
+def test_cli_reads_the_config_file(tmp_path, capsys, monkeypatch):
+    _write(
+        tmp_path / "zensical.toml",
+        """
+        [tool.zensical-carve]
+        docs-dir = "pages"
+        emoji = "unicode"
+        """,
+    )
+    pages = tmp_path / "pages"
+    pages.mkdir()
+    (pages / "page.crv").write_text("Hi :smile:\n", encoding="utf-8")
+    monkeypatch.chdir(tmp_path)
+
+    assert main(["prepare"]) == 0
+
+    body = (pages / "page.md").read_text(encoding="utf-8")
+    assert "😄" in body or "zensical" not in sys.modules
+    assert "settings from" in capsys.readouterr().out
+
+
+def test_clean_reports_a_directory_that_is_not_there(tmp_path, capsys, monkeypatch):
+    """Deleting nothing and reporting success is how a typo hides."""
+    monkeypatch.chdir(tmp_path)
+
+    assert main(["clean", "--docs-dir", "no-such-dir"]) == 2
+    assert "not a directory" in capsys.readouterr().err
+
+
+def test_source_path_is_quoted_so_a_colon_cannot_break_the_front_matter(tmp_path):
+    docs = tmp_path / "docs"
+    docs.mkdir()
+    (docs / "page: draft.crv").write_text("# Page\n", encoding="utf-8")
+
+    convert_tree(docs)
+    body = (docs / "page: draft.md").read_text(encoding="utf-8")
+    front_matter = yaml.safe_load(body.split("---")[1])
+
+    assert front_matter[SOURCE_KEY].endswith("page: draft.crv")
+
+
+def test_config_is_taken_from_the_environment_when_no_path_is_given(tmp_path, monkeypatch):
+    """`build --config FILE` reaches the fence, which runs in another process."""
+    elsewhere = tmp_path / "elsewhere"
+    elsewhere.mkdir()
+    _write(
+        elsewhere / "carve.toml",
+        """
+        [tool.zensical-carve]
+        extensions = ["details"]
+        """,
+    )
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv(config.CONFIG_ENV, str(elsewhere / "carve.toml"))
+
+    assert config.load().extensions == ("details",)
+
+
+def test_resolved_settings_round_trip_through_the_environment(monkeypatch, tmp_path):
+    """`build` renders pages itself and hands the answer to the child process."""
+    settings = config.Settings(
+        extensions=("details",), emoji="unicode", symbols={"crab": "🦀"}
+    )
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv(config.SETTINGS_ENV, config.encode(settings))
+
+    loaded = config.load()
+
+    assert loaded.extensions == ("details",)
+    assert loaded.emoji == "unicode"
+    assert loaded.symbols == {"crab": "🦀"}
+
+
+# --- Zensical's cache ------------------------------------------------------
+#
+# A Carve setting is not one of Zensical's cache inputs. Measured on 0.0.56:
+# switching `emoji` from twemoji to unicode and rebuilding served the twemoji
+# page again, because index.md had not changed.
+
+
+def test_a_first_build_in_a_clean_tree_does_not_ask_for_a_clean(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+
+    assert preprocess._settings_changed('{"emoji": "none"}') is False
+
+
+def test_a_changed_setting_asks_for_a_clean(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    preprocess._record_settings('{"emoji": "twemoji"}')
+
+    assert preprocess._settings_changed('{"emoji": "twemoji"}') is False
+    assert preprocess._settings_changed('{"emoji": "unicode"}') is True
+
+
+def test_an_existing_cache_without_a_stamp_asks_for_a_clean(tmp_path, monkeypatch):
+    """A cache built before this package knew to record anything."""
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / ".cache").mkdir()
+
+    assert preprocess._settings_changed('{"emoji": "none"}') is True

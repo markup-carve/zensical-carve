@@ -89,6 +89,44 @@ title: A whole Carve page
 becomes a page whose `title` Zensical reads, exactly as if you had written the
 front matter in Markdown.
 
+### Configuration
+
+Every setting can live in a `[tool.zensical-carve]` table instead of on the
+command line, so a site renders the same way on every build and in CI:
+
+``` toml
+[tool.zensical-carve]
+extensions = ["details", "tabs", "fenced-render", "math-block", "semantic-span"]
+emoji = "twemoji"
+docs-dir = "docs"
+```
+
+`zensical.toml` is read first - Zensical ignores a table it does not know, so
+the Carve settings sit next to the rest of the site's configuration - and
+`pyproject.toml` is read when `zensical.toml` has no table. A flag beats the
+file, so `--extension` on the command line replaces the configured list for
+that one run. `--config FILE` points at a file directly.
+
+| key | what it takes |
+| --- | --- |
+| `extensions` | list of Carve extension names |
+| `emoji` | `none` (default), `unicode`, or `twemoji` |
+| `symbols` | inline table, or a path to a JSON object, mapping a name to what `:name:` renders as |
+| `docs-dir` | the directory to walk, default `docs` |
+| `raw-html` | `true` to skip the theme adaptation |
+
+**Changing a setting cleans Zensical's cache.** A rendered page is cached by
+Zensical's own inputs, and a Carve setting is not one of them - switching
+`emoji` and rebuilding served the old page again, measured on 0.0.56. So
+`zensical-carve build` records what it rendered with and passes `--clean` when
+that changes. Running `zensical build` yourself does not: clean it by hand
+after changing the table, or use `zensical-carve build`.
+
+**The fence reads this table too.** A ` ```carve ` block inside a Markdown page
+had no way to enable an extension before - superfences hands a fence its own
+options, and a Carve fence line carries none. Now a block and a whole page
+render alike.
+
 ### Commands
 
 | command | what it does |
@@ -97,8 +135,10 @@ front matter in Markdown.
 | `zensical-carve build` | `prepare`, then run `zensical build`; extra arguments pass through |
 | `zensical-carve clean` | delete the generated pages, and only those |
 
-Options: `--docs-dir` (default `docs`), `--extension NAME` (repeatable, enables
-a Carve extension), `--force`, `--raw-html`.
+Options: `--docs-dir` (default `docs`), `--config FILE`, `--extension NAME`
+(repeatable, enables a Carve extension), `--emoji none|unicode|twemoji`,
+`--symbols FILE.json`, `--force`, `--raw-html`. Each has a key in the
+configuration table above.
 
 A generated page carries `zensical_carve: generated` in its front matter. That
 marker is what `clean` deletes on, and what stops `prepare` from overwriting a
@@ -109,6 +149,13 @@ page you wrote by hand - it reports and skips instead, unless you pass
 
 **Add generated pages to `nav`.** They are ordinary pages, so an explicit `nav`
 in `zensical.toml` needs an entry for each one, pointing at the `.md`.
+
+**A build warning names the generated page, not your source.** Zensical
+validates links against the file it read, so a broken link written in
+`page.crv` is reported at `page.md:7:15` - a line of HTML you never wrote.
+Every generated page carries `zensical_carve_source` in its front matter, which
+is the one hop back. This is Zensical's [backlog#109][backlog-109], and it goes
+away when errors are attributed to input files.
 
 **The `.crv` file is copied into the built site too.** Zensical treats any
 non-page file in `docs/` as a static asset and has no `exclude` setting as of
@@ -200,9 +247,31 @@ configuration.
 ### Emoji is not an extension
 
 `:smile:` parsing is core and on by default, but the map from a name to a glyph
-is a render option rather than an extension, and **this plugin does not expose it
-yet**. Until it does, `:smile:` renders as its own source text. Material ships
-twemoji enabled, so this is the one default a migrating project will notice.
+is a render option rather than an extension, so a document that reaches the
+engine without one renders `:smile:` as its own source text. Set `emoji`:
+
+``` toml
+[tool.zensical-carve]
+emoji = "twemoji"
+```
+
+`twemoji` emits the same `<img class="twemoji">` element Zensical emits for a
+Markdown page, from Zensical's own emoji index and pointing at the same CDN, so
+the two page types look identical and the theme's sizing applies. `unicode`
+emits the character itself - no network, no images, and it inherits the page's
+font, which on Linux is often no color emoji font at all.
+
+Names that resolve to an icon rather than an emoji (`:material-home:` and its
+ten thousand siblings) are not in the map: they are SVG files on disk, and
+reading them all to build one map costs more than the feature is worth. Add the
+ones you use through `symbols`, which takes anything - the engine substitutes a
+symbol raw, markup included:
+
+``` toml
+[tool.zensical-carve.symbols]
+crab = "🦀"
+shipped = "<span class=\"badge\">shipped</span>"
+```
 
 ## Why there is no Zensical module
 
@@ -226,3 +295,4 @@ MIT
 [carve-lang]: https://pypi.org/project/carve-lang/
 [zensical]: https://zensical.org/
 [zensical-plugins]: https://zensical.org/compatibility/plugins/
+[backlog-109]: https://github.com/zensical/backlog/issues/109

@@ -25,7 +25,11 @@ INDEX = """\
 ```carve
 ## Rendered by Carve
 
-A *bold* and /italic/ line, {=highlighted=} text.
+A *bold* and /italic/ line, {=highlighted=} text, and a :smile: symbol.
+
+::: details "Only with the extension"
+Which the fence can only know from the configuration table.
+:::
 ```
 """
 
@@ -35,6 +39,8 @@ title: A whole Carve page
 ---
 
 # Whole page mode
+
+A :smile: here too.
 
 ## A second heading, so the table of contents has something to hold
 
@@ -66,6 +72,13 @@ def main() -> int:
             '  { "Markdown in 5min" = "markdown.md" },\n'
             '  { "A whole Carve page" = "whole.md" },',
         )
+        # Settings both seams read. Zensical ignores a table it does not know,
+        # which is what lets them live in its own configuration file.
+        config += (
+            "\n[tool.zensical-carve]\n"
+            'extensions = ["details"]\n'
+            'emoji = "twemoji"\n'
+        )
         config_path.write_text(config, encoding="utf-8")
 
         (site / "docs" / "index.md").write_text(INDEX, encoding="utf-8")
@@ -85,6 +98,10 @@ def main() -> int:
             _fail("the fence did not render: Carve highlight is missing")
         if "<em>bold</em>" in index:
             _fail("Markdown claimed the block - `*` must be strong in Carve, not emphasis")
+        if "<details>" not in index:
+            _fail("the fence ignored the extensions in [tool.zensical-carve]")
+        if 'class="twemoji"' not in index:
+            _fail("the fence ignored the emoji setting in [tool.zensical-carve]")
 
         whole = (site / "site" / "whole" / "index.html").read_text(encoding="utf-8")
         if "Whole page mode" not in whole:
@@ -103,8 +120,30 @@ def main() -> int:
             _fail("the lifted front matter did not reach the page title")
         if "zensical_carve" in whole:
             _fail("the generated front matter leaked into the body")
+        if 'class="twemoji"' not in whole:
+            _fail("the whole page ignored the emoji setting")
 
-    print("e2e: both seams rendered, front matter lifted, title set")
+        # The generated page must say which .crv it came from: Zensical
+        # attributes a warning to the file it read, and that is this one.
+        generated = (site / "docs" / "whole.md").read_text(encoding="utf-8")
+        if 'zensical_carve_source: "docs/whole.crv"' not in generated:
+            _fail("the generated page does not record its source")
+
+        # `build` renders the pages here and the fences in a child process.
+        # A flag has to reach both, or one page can hold two spellings of the
+        # same symbol.
+        subprocess.run(
+            [sys.executable, "-m", "zensical_carve.preprocess", "build",
+             "--force", "--emoji", "unicode"],
+            cwd=site,
+            check=True,
+            capture_output=True,
+        )
+        index = (site / "site" / "index.html").read_text(encoding="utf-8")
+        if "😄" not in index or 'class="twemoji"' in index:
+            _fail("`build --emoji unicode` did not reach the fence in the child process")
+
+    print("e2e: both seams rendered, settings honored, front matter lifted")
     return 0
 
 

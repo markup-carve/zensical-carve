@@ -7,8 +7,38 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Settings are read from a `[tool.zensical-carve]` table in `zensical.toml`, or
+  in `pyproject.toml` when `zensical.toml` has none: `extensions`, `emoji`,
+  `symbols`, `docs-dir` and `raw-html`. Flags still win over the file. The
+  ` ```carve ` fence reads the same table, so a Carve block and a whole Carve
+  page render with the same extensions - the fence had no way to enable one
+  before.
+- `emoji = "twemoji"` (or `--emoji twemoji`) renders `:smile:` as the same
+  `<img class="twemoji">` element a Markdown page on the same site gets, from
+  Zensical's own emoji index. `unicode` emits the character instead, `none`
+  stays the default. `symbols` adds or overrides individual names.
+- `zensical-carve build` passes `--clean` when the Carve settings changed since
+  the last build. A rendered page is cached by Zensical's own inputs, and a
+  Carve setting is not one of them, so a fenced block kept its old rendering
+  after the table changed.
+- A generated page records the `.crv` it came from in `zensical_carve_source`,
+  because Zensical attributes a warning to the file it read - the generated
+  `.md` - and points at a line of HTML the author never wrote.
+
+### Changed
+
+- `convert_tree` returns an `Outcome` (`written`, `skipped`, `failed`) instead
+  of a list of paths, so a caller can tell the three apart. The package has not
+  been released, so nothing depends on the old shape.
+
 ### Fixed
 
+- One page the engine refuses no longer stops the walk, and the message names
+  the file. A tree of any size previously reported one message with no path in
+  it. A page that is not valid UTF-8 is reported the same way instead of
+  raising a decode error with a byte offset and no file name.
 - A code block an extension has put markup into stays HTML instead of being
   handed back as a Markdown fence. Code callouts emit `<b class="callout">`
   inside the block, and fencing printed those tags as text.
