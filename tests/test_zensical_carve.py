@@ -16,7 +16,7 @@ from pathlib import Path
 import pytest
 import yaml
 
-from zensical_carve import CarveError, config, fence, render, symbols
+from zensical_carve import CarveError, config, fence, prerender, render, symbols
 from zensical_carve import preprocess
 from zensical_carve.preprocess import (
     GENERATED_MARKER,
@@ -575,3 +575,224 @@ def test_an_existing_cache_without_a_stamp_asks_for_a_clean(tmp_path, monkeypatc
     (tmp_path / ".cache").mkdir()
 
     assert preprocess._settings_changed('{"emoji": "none"}') is True
+
+
+# --- prerendering diagrams -------------------------------------------------
+#
+# No test here reaches the network. The command backend is the one that can be
+# driven from a test, and the Kroki path is exercised through its failure -
+# which is the behavior that matters, because a diagram that will not render
+# must leave the page working.
+
+SVG = '<?xml version="1.0"?>\n<svg xmlns="http://www.w3.org/2000/svg">\n\n<rect/>\n</svg>'
+
+ECHO_SVG = (
+    f"{sys.executable} -c "
+    f"\"import sys; sys.stdout.write({SVG!r})\""
+)
+
+
+def _diagram_html(language="mermaid"):
+    return f'<pre class="{language}">flowchart LR\n  A --&gt; B</pre>'
+
+
+def test_a_listed_language_becomes_a_picture(tmp_path):
+    out = prerender.apply(
+        _diagram_html(),
+        languages=("mermaid",),
+        commands={"mermaid": ECHO_SVG},
+        cache=tmp_path,
+    )
+
+    assert '<div class="carve-diagram carve-diagram-mermaid">' in out
+    assert "<svg" in out
+    assert "<pre" not in out
+
+
+def test_an_unlisted_language_is_left_alone(tmp_path):
+    html = _diagram_html("d2")
+
+    assert prerender.apply(html, languages=("mermaid",), cache=tmp_path) == html
+
+
+def test_the_prolog_and_blank_lines_are_stripped(tmp_path):
+    """A blank line ends a raw HTML block, so half the picture would be text."""
+    out = prerender.apply(
+        _diagram_html(),
+        languages=("mermaid",),
+        commands={"mermaid": ECHO_SVG},
+        cache=tmp_path,
+    )
+
+    assert "<?xml" not in out
+    assert "\n\n" not in out
+
+
+def test_the_payload_reaches_the_command_unescaped(tmp_path):
+    """Carve escapes `>` into `&gt;`; a diagram language wants the character."""
+    show_input = (
+        f"{sys.executable} -c "
+        '"import sys;print(\'<svg>\'+open(sys.argv[1]).read()+\'</svg>\')" {input}'
+    )
+    out = prerender.apply(
+        _diagram_html(),
+        languages=("mermaid",),
+        commands={"mermaid": show_input},
+        cache=tmp_path,
+    )
+
+    assert "A --> B" in out
+    assert "&gt;" not in out
+
+
+def test_a_failing_command_leaves_the_block_for_the_browser(tmp_path):
+    warnings = []
+    html = _diagram_html()
+
+    out = prerender.apply(
+        html,
+        languages=("mermaid",),
+        commands={"mermaid": f"{sys.executable} -c \"raise SystemExit(3)\""},
+        cache=tmp_path,
+        warn=warnings.append,
+    )
+
+    assert out == html
+    assert warnings and "exited 3" in warnings[0]
+
+
+def test_a_language_kroki_does_not_serve_is_reported_not_dropped(tmp_path):
+    warnings = []
+    html = _diagram_html("abc")
+
+    out = prerender.apply(html, languages=("abc",), cache=tmp_path, warn=warnings.append)
+
+    assert out == html
+    assert warnings and "no Kroki service" in warnings[0]
+
+
+def test_a_rendered_diagram_is_cached_between_runs(tmp_path):
+    once = (
+        f"{sys.executable} -c "
+        f"\"import pathlib,sys; p=pathlib.Path({str(tmp_path / 'ran')!r});"
+        f" p.exists() and sys.exit(1); p.write_text('x');"
+        f" sys.stdout.write({SVG!r})\""
+    )
+    first = prerender.apply(
+        _diagram_html(), languages=("mermaid",), commands={"mermaid": once}, cache=tmp_path
+    )
+    second = prerender.apply(
+        _diagram_html(), languages=("mermaid",), commands={"mermaid": once}, cache=tmp_path
+    )
+
+    assert "<svg" in first
+    assert second == first  # the command would have failed on a second run
+
+
+def test_options_are_nothing_until_a_language_is_listed():
+    assert prerender.Options.from_settings(config.Settings()) is None
+
+    options = prerender.Options.from_settings(
+        config.Settings(prerender=("mermaid",), prerender_url="http://kroki.internal")
+    )
+    assert options is not None
+    assert options.languages == ("mermaid",)
+    assert options.url == "http://kroki.internal"
+
+
+def test_cli_refuses_a_language_nothing_can_render(tmp_path, capsys, monkeypatch):
+    docs = tmp_path / "docs"
+    docs.mkdir()
+    (docs / "page.crv").write_text("# Page\n", encoding="utf-8")
+    monkeypatch.chdir(tmp_path)
+
+    assert main(["prepare", "--prerender", "abc"]) == 2
+    assert "nothing renders abc" in capsys.readouterr().err
+
+
+def test_a_backend_that_succeeds_without_an_svg_is_a_failure(tmp_path):
+    """A proxy answering 200 with an HTML page, or a binary printing usage."""
+    warnings = []
+    html = _diagram_html()
+
+    out = prerender.apply(
+        html,
+        languages=("mermaid",),
+        commands={"mermaid": f"{sys.executable} -c \"print('<html>nope</html>')\""},
+        cache=tmp_path,
+        warn=warnings.append,
+    )
+
+    assert out == html
+    assert warnings and "no whole SVG" in warnings[0]
+
+
+def test_a_command_line_that_will_not_parse_is_a_render_failure(tmp_path):
+    """An unbalanced quote in the configuration must not end the build."""
+    warnings = []
+    html = _diagram_html()
+
+    out = prerender.apply(
+        html,
+        languages=("mermaid",),
+        commands={"mermaid": 'mmdc -i "{input}'},
+        cache=tmp_path,
+        warn=warnings.append,
+    )
+
+    assert out == html
+    assert warnings and "will not parse" in warnings[0]
+
+
+def test_a_damaged_cache_entry_is_a_miss_not_a_failure(tmp_path):
+    """A build interrupted mid-write must not poison every later build."""
+    html = _diagram_html()
+    prerender.apply(
+        html, languages=("mermaid",), commands={"mermaid": ECHO_SVG}, cache=tmp_path
+    )
+    entry = next(tmp_path.glob("*.svg"))
+    entry.write_text("<svg>truncated", encoding="utf-8")
+
+    out = prerender.apply(
+        html, languages=("mermaid",), commands={"mermaid": ECHO_SVG}, cache=tmp_path
+    )
+
+    assert "<rect/>" in out
+    assert entry.read_text(encoding="utf-8").endswith("</svg>")
+
+
+def test_the_fence_warns_about_a_language_nothing_renders(tmp_path, capsys, monkeypatch):
+    """It runs inside `zensical build`; raising would take the site down."""
+    _write(
+        tmp_path / "zensical.toml",
+        """
+        [tool.zensical-carve]
+        prerender = ["abc"]
+        """,
+    )
+    monkeypatch.chdir(tmp_path)
+    import zensical_carve
+
+    zensical_carve._runtime.cache_clear()
+
+    assert "<p>x</p>" in fence("x\n", "carve", "carve", {}, None)
+    assert "nothing renders abc" in capsys.readouterr().err
+    zensical_carve._runtime.cache_clear()
+
+
+def test_output_that_does_not_end_the_svg_is_a_failure(tmp_path):
+    """A truncated response, or one with something appended after the picture."""
+    warnings = []
+    html = _diagram_html()
+    truncated = f"{sys.executable} -c \"print('<svg><rect/>')\""
+
+    out = prerender.apply(
+        html,
+        languages=("mermaid",),
+        commands={"mermaid": truncated},
+        cache=tmp_path,
+        warn=warnings.append,
+    )
+
+    assert out == html
+    assert warnings and "no whole SVG" in warnings[0]
