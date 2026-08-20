@@ -9,6 +9,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Diagrams can be drawn at build time instead of in the reader's browser:
+  `prerender = ["graphviz", "d2"]` replaces the client-side block with its SVG.
+  Rendering goes through a Kroki instance (`prerender-url`) or a local command
+  (`prerender-command`), results are cached under `.zensical-carve/diagrams`, and a diagram that
+  will not render keeps its block so the page works as before.
 - Settings are read from a `[tool.zensical-carve]` table in `zensical.toml`, or
   in `pyproject.toml` when `zensical.toml` has none: `extensions`, `emoji`,
   `symbols`, `docs-dir` and `raw-html`. Flags still win over the file. The

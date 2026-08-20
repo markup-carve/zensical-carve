@@ -88,6 +88,10 @@ class Settings:
     force: bool = False
     emoji: str = "none"
     symbols: dict[str, str] = field(default_factory=dict)
+    prerender: tuple[str, ...] = ()
+    prerender_url: str = ""
+    prerender_command: dict[str, str] = field(default_factory=dict)
+    prerender_timeout: int = 0
     source: Path | None = None
     """The file the table came from, or ``None`` when nothing was found."""
 
@@ -155,6 +159,10 @@ _READERS: dict[str, str] = {
     "raw-html": "raw_html",
     "emoji": "emoji",
     "symbols": "symbols",
+    "prerender": "prerender",
+    "prerender-url": "prerender_url",
+    "prerender-command": "prerender_command",
+    "prerender-timeout": "prerender_timeout",
 }
 
 
@@ -199,6 +207,30 @@ def _value(name: str, raw: Any, source: Path) -> Any:
     if name == "symbols":
         return _symbols(raw, source)
 
+    if name == "prerender":
+        if not isinstance(raw, list) or not all(isinstance(x, str) for x in raw):
+            raise ConfigError(f"{source}: prerender must be a list of strings")
+        return tuple(raw)
+
+    if name == "prerender_url":
+        if not isinstance(raw, str):
+            raise ConfigError(f"{source}: prerender-url must be a string")
+        return raw
+
+    if name == "prerender_timeout":
+        if not isinstance(raw, int) or isinstance(raw, bool) or raw <= 0:
+            raise ConfigError(f"{source}: prerender-timeout must be seconds, above zero")
+        return raw
+
+    if name == "prerender_command":
+        if not isinstance(raw, Mapping) or not all(
+            isinstance(k, str) and isinstance(v, str) for k, v in raw.items()
+        ):
+            raise ConfigError(
+                f"{source}: prerender-command must map a language to a command line"
+            )
+        return dict(raw)
+
     raise AssertionError(name)  # pragma: no cover
 
 
@@ -238,6 +270,10 @@ def encode(settings: Settings) -> str:
             else None,
             "emoji": settings.emoji,
             "symbols": settings.symbols,
+            "prerender": list(settings.prerender),
+            "prerender_url": settings.prerender_url,
+            "prerender_command": settings.prerender_command,
+            "prerender_timeout": settings.prerender_timeout,
         }
     )
 
@@ -254,6 +290,10 @@ def _decode(raw: str) -> Settings:
         extensions=tuple(extensions) if extensions is not None else None,
         emoji=data.get("emoji", "none"),
         symbols=dict(data.get("symbols") or {}),
+        prerender=tuple(data.get("prerender") or ()),
+        prerender_url=data.get("prerender_url") or "",
+        prerender_command=dict(data.get("prerender_command") or {}),
+        prerender_timeout=int(data.get("prerender_timeout") or 0),
     )
 
 

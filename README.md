@@ -114,6 +114,10 @@ that one run. `--config FILE` points at a file directly.
 | `symbols` | inline table, or a path to a JSON object, mapping a name to what `:name:` renders as |
 | `docs-dir` | the directory to walk, default `docs` |
 | `raw-html` | `true` to skip the theme adaptation |
+| `prerender` | list of diagram languages to draw at build time |
+| `prerender-url` | a Kroki instance, default `https://kroki.io` |
+| `prerender-command` | per-language command line, for a local binary |
+| `prerender-timeout` | seconds one diagram may take, default 60 |
 
 **Changing a setting cleans Zensical's cache.** A rendered page is cached by
 Zensical's own inputs, and a Carve setting is not one of them - switching
@@ -137,7 +141,8 @@ render alike.
 
 Options: `--docs-dir` (default `docs`), `--config FILE`, `--extension NAME`
 (repeatable, enables a Carve extension), `--emoji none|unicode|twemoji`,
-`--symbols FILE.json`, `--force`, `--raw-html`. Each has a key in the
+`--symbols FILE.json`, `--prerender LANGUAGE` (repeatable), `--prerender-url
+URL`, `--force`, `--raw-html`. Each has a key in the
 configuration table above.
 
 A generated page carries `zensical_carve: generated` in its front matter. That
@@ -217,6 +222,57 @@ zensical/backlog#29:
 `fenced-render` alone covers ` ```mermaid `. The others each claim their own
 fence word.
 
+### Diagrams at build time
+
+Carve's diagram fences emit the block a client-side library picks up, so the
+reader downloads Mermaid, sees the source for a moment, and watches the page
+shift when the picture replaces it. Listing a language draws it during the
+build instead:
+
+``` toml
+[tool.zensical-carve]
+extensions = ["fenced-render", "fenced-render-graphviz", "fenced-render-d2"]
+prerender = ["graphviz", "d2"]
+```
+
+`<pre class="graphviz">` becomes `<div class="carve-diagram carve-diagram-graphviz">`
+with the SVG inside it. Nothing else on the page changes, and a language you do
+not list is left for the browser exactly as before.
+
+Two backends. By default the source is POSTed to [Kroki][kroki], which speaks
+`mermaid`, `d2`, `graphviz`, `plantuml`, `wavedrom` and `vega-lite`. **That
+sends the diagram off the machine**, so point `prerender-url` at your own
+instance for anything not public. Or render locally, and nothing leaves at all:
+
+``` toml
+[tool.zensical-carve.prerender-command]
+mermaid = "mmdc -i {input} -o {output}"
+graphviz = "dot -Tsvg {input}"
+```
+
+`{input}` is the diagram source in a temporary file, `{output}` is where the
+picture should go; a command without `{output}` is read from its standard
+output. A command beats Kroki for that language.
+
+Rendered pictures are cached under `.zensical-carve/diagrams`, keyed by the
+source and the backend, so a second build draws nothing again. Add that
+directory to `.gitignore`, and delete it to force a redraw. It sits outside
+Zensical's own `.cache` on purpose: diagrams are drawn while the pages are
+prepared, and `zensical build --clean` empties `.cache` after that, which threw
+away every picture that had just been drawn.
+
+**A diagram that will not render leaves its block alone**, warns, and names the
+page - the client-side library then picks it up the way it did before. Two
+things worth knowing before you turn this on: the public Kroki instance renders
+graphviz in under a second but runs a headless browser for mermaid, which timed
+out at 30 seconds during this work (hence the 60 second default and
+`prerender-timeout`); and a graphviz SVG carries `fill="white"`, so it wants a
+CSS rule of yours in dark mode.
+
+`chart` and `abc` have no Kroki service. Give them a command or leave them
+client-side - listing one without a command is an error rather than a silent
+skip.
+
 ### The reference-document set
 
 For handbooks and specifications rather than product docs:
@@ -294,5 +350,6 @@ MIT
 [carve]: https://markup-carve.github.io/carve/
 [carve-lang]: https://pypi.org/project/carve-lang/
 [zensical]: https://zensical.org/
+[kroki]: https://kroki.io/
 [zensical-plugins]: https://zensical.org/compatibility/plugins/
 [backlog-109]: https://github.com/zensical/backlog/issues/109

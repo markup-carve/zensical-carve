@@ -21,6 +21,7 @@ a non-``.md`` file into the output verbatim, so a ``.crv`` page has to become a
 from __future__ import annotations
 
 import functools
+import sys
 from typing import Any, Mapping, Sequence
 
 __all__ = ["__version__", "CarveError", "fence", "render"]
@@ -105,12 +106,26 @@ def fence(
     There is nowhere else they could come from: superfences hands a fence its
     own options, and the fence line of a Carve block carries none.
     """
-    settings, symbol_map = _runtime()
-    return render(source, extensions=settings.extensions, symbols=symbol_map)
+    settings, symbol_map, prerender_options = _runtime()
+    html = render(source, extensions=settings.extensions, symbols=symbol_map)
+    if prerender_options is not None:
+        from . import prerender
+
+        html = prerender.apply(
+            html,
+            languages=prerender_options.languages,
+            url=prerender_options.url,
+            commands=prerender_options.commands,
+            cache=prerender_options.cache,
+            timeout=prerender_options.timeout,
+        )
+    return html
 
 
 @functools.lru_cache(maxsize=1)
-def _runtime() -> tuple["config.Settings", Mapping[str, str] | None]:
+def _runtime() -> tuple[
+    "config.Settings", Mapping[str, str] | None, "prerender.Options | None"
+]:
     """The configuration table and its symbol map, built once per process.
 
     A build calls the fence for every Carve block on every page, and the emoji
@@ -118,10 +133,21 @@ def _runtime() -> tuple["config.Settings", Mapping[str, str] | None]:
     cannot change underneath a build - Zensical has already parsed the same
     file to know the fence exists.
     """
-    from . import config, symbols as symbol_module
+    from . import config, prerender, symbols as symbol_module
 
     try:
         settings = config.load()
     except config.ConfigError as error:
         raise CarveError(str(error)) from error
-    return settings, symbol_module.build(settings.emoji, settings.symbols)
+    options = prerender.Options.from_settings(settings)
+    if options is not None:
+        # A warning rather than a refusal: this runs inside `zensical build`,
+        # where raising would take the whole site down over a spelling.
+        unknown = prerender.unsupported(options)
+        if unknown:
+            print(
+                f"zensical-carve: nothing renders {', '.join(unknown)} -"
+                " those blocks stay client-side",
+                file=sys.stderr,
+            )
+    return settings, symbol_module.build(settings.emoji, settings.symbols), options

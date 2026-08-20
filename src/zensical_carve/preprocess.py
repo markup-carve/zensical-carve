@@ -35,7 +35,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Iterable, Mapping, Sequence
 
-from . import CarveError, config, render, symbols as symbol_module
+from . import CarveError, config, prerender as prerender_module, render, symbols as symbol_module
 from .config import ConfigError, Settings
 from .theme import adapt
 
@@ -102,6 +102,7 @@ def convert(
     theme: bool = True,
     symbols: Mapping[str, str] | None = None,
     source_path: Path | None = None,
+    prerender: "prerender_module.Options | None" = None,
 ) -> str:
     """Render one Carve document into the text of a Markdown page.
 
@@ -113,6 +114,16 @@ def convert(
     """
     front_matter, _ = _split_front_matter(source)
     html = render(source, extensions=extensions, symbols=symbols)
+    if prerender is not None:
+        html = prerender_module.apply(
+            html,
+            languages=prerender.languages,
+            url=prerender.url,
+            commands=prerender.commands,
+            cache=prerender.cache,
+            timeout=prerender.timeout,
+            warn=_warner(source_path),
+        )
     if theme:
         html = adapt(html)
 
@@ -127,6 +138,16 @@ def convert(
         head.append(f"{SOURCE_KEY}: {json.dumps(source_path.as_posix())}")
     head.append("---")
     return "\n".join(head) + "\n\n" + html.rstrip("\n") + "\n"
+
+
+def _warner(source_path: Path | None):
+    """A diagram that will not render says which page it is on."""
+
+    def warn(message: str) -> None:
+        where = f"{source_path}: " if source_path is not None else ""
+        print(f"zensical-carve: {where}could not prerender {message}", file=sys.stderr)
+
+    return warn
 
 
 def _is_generated(path: Path) -> bool:
@@ -151,6 +172,7 @@ def convert_tree(
     force: bool = False,
     theme: bool = True,
     symbols: Mapping[str, str] | None = None,
+    prerender: "prerender_module.Options | None" = None,
 ) -> Outcome:
     """Render every ``.crv`` under ``docs_dir`` to a sibling ``.md``.
 
@@ -181,6 +203,7 @@ def convert_tree(
                 theme=theme,
                 symbols=symbols,
                 source_path=source_path,
+                prerender=prerender,
             )
         except CarveError as error:
             outcome.failed.append((source_path, str(error)))
@@ -255,6 +278,19 @@ def _add_render_options(parser: argparse.ArgumentParser) -> None:
         help="a JSON object mapping a symbol name to what it renders as",
     )
     parser.add_argument(
+        "--prerender",
+        action="append",
+        dest="prerender",
+        metavar="LANGUAGE",
+        help="render this diagram language at build time; repeat for several",
+    )
+    parser.add_argument(
+        "--prerender-url",
+        default=None,
+        metavar="URL",
+        help=f"the Kroki instance to render with (default: {prerender_module.KROKI_URL})",
+    )
+    parser.add_argument(
         "--force",
         action="store_true",
         help="overwrite a .md this tool did not generate",
@@ -283,6 +319,8 @@ def _resolve(args: argparse.Namespace) -> Settings:
         emoji=args.emoji,
         force=args.force,
         raw_html=args.raw_html,
+        prerender=tuple(args.prerender) if args.prerender else None,
+        prerender_url=args.prerender_url,
         **extra,
     )
 
@@ -339,12 +377,25 @@ def main(argv: Sequence[str] | None = None) -> int:
         print(f"zensical-carve: {error}", file=sys.stderr)
         return 2
 
+    prerender = prerender_module.Options.from_settings(settings)
+    if prerender is not None:
+        unknown = prerender_module.unsupported(prerender)
+        if unknown:
+            known = ", ".join(sorted(prerender_module.KROKI_LANGUAGES))
+            print(
+                f"zensical-carve: nothing renders {', '.join(unknown)}"
+                f" - give it a prerender-command, or pick from: {known}",
+                file=sys.stderr,
+            )
+            return 2
+
     outcome = convert_tree(
         docs_dir,
         extensions=settings.extensions,
         force=settings.force,
         theme=not settings.raw_html,
         symbols=symbols,
+        prerender=prerender,
     )
 
     for path in outcome.written:
