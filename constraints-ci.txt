@@ -27,4 +27,11 @@
 #      only when an older engine genuinely stops working - never merely because
 #      a newer one exists. `tests/test_engine_floor.py` is what reports the case
 #      the current floor was set for.
+#
+# `.github/workflows/scheduled.yml` deliberately does NOT install under this
+# file. Pinning every run would mean no run ever meets a new engine release, so
+# that daily job resolves the engine the way a user's install does and is where
+# the drift is noticed - a day after a release, in a run nobody's pull request
+# is waiting on. `release.yml` is unconstrained for the same reason: its gate
+# asks what a consumer gets, not what CI measured.
 carve-lang==0.1.1
