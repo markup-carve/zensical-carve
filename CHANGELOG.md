@@ -7,7 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- The Carve engine dependency is bounded: `carve-lang>=0.1.1,<0.2.0`. On the
+  engine's own 0.x scheme `0.1` is the major, so the previous open range admitted
+  breaking releases by the engine's own rules.
+  markup-carve/zensical-carve#5
+
 ### Added
+
+- The engine floor is a checked claim rather than a number:
+  `tests/test_engine_floor.py` asserts the resolved engine sanitizes a
+  list-valued URL attribute, which is the defect `>=0.1.1` exists for.
+  markup-carve/zensical-carve#5
 
 - Diagrams can be drawn at build time instead of in the reader's browser:
   `prerender = ["graphviz", "d2"]` replaces the client-side block with its SVG.

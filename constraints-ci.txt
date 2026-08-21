@@ -1,0 +1,30 @@
+# The engine version CI measures.
+#
+# `pyproject.toml` declares a RANGE, which is the right thing for a consumer and
+# the wrong thing for a test run: a range resolves to whatever PyPI serves at the
+# moment the job runs, so two runs of the same commit can measure two different
+# engines and neither run records which one it used. Both jobs below install the
+# engine - the test matrix across four Python versions, and the end-to-end
+# Zensical build - so that was five unrecorded resolutions per pull request.
+#
+# It is not hypothetical. In the sibling repo `markup-carve/mkdocs-carve`, an
+# open floor picked up carve-lang 0.1.1 the day it published and `main` was red
+# for two days over an engine change nobody in that repo made.
+#
+# So `.github/workflows/ci.yml` installs under this file. A green PR run stays
+# green, and the run states the engine behind its result.
+#
+# Only the engine is pinned. zensical, pytest and the rest float on purpose:
+# they are not what this package's output depends on, and pinning them would add
+# a maintenance surface the defect does not call for.
+#
+# Raising this pin is a deliberate act, not a chore:
+#
+#   1. Bump the version here and let CI run. A failure is the engine changing
+#      what the suite measures, which is the signal this file exists to produce.
+#   2. Decide separately whether the FLOOR in `pyproject.toml` moves. It is a
+#      real claim about the oldest engine this package works with, so it moves
+#      only when an older engine genuinely stops working - never merely because
+#      a newer one exists. `tests/test_engine_floor.py` is what reports the case
+#      the current floor was set for.
+carve-lang==0.1.1
