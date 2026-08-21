@@ -1,0 +1,54 @@
+name: Scheduled suite
+
+# The other half of the split that `constraints-ci.txt` describes.
+#
+# Per-PR CI installs UNDER that file, so a green run stays green and each job
+# states the engine behind its result. The cost of pinning is that no pinned run
+# ever meets a new carve-lang release - it would sit unnoticed until someone
+# raised the pin by hand, which is the same silence the pin was added to end,
+# only pointing the other way.
+#
+# So this job installs UNCONSTRAINED, on purpose. It resolves the engine the way
+# a user's install does - anywhere in the range `pyproject.toml` declares - a day
+# after a release rather than whenever someone next opens a pull request. A
+# failure here is the engine changing what this package renders, which is
+# exactly the event worth hearing about, and it fails in a run nobody's pull
+# request is waiting on.
+#
+# `release.yml` also installs unconstrained, for the same reason: its gate asks
+# what a consumer gets, not what CI measured.
+
+on:
+  schedule:
+    # 05:00 UTC daily, after the engine repos have had a night to settle.
+    - cron: "0 5 * * *"
+  workflow_dispatch:
+
+jobs:
+  suite:
+    name: Latest engine in the declared range
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+
+      - name: Install, unconstrained
+        run: pip install -e ".[dev]"
+
+      # Printed, not asserted: the point is that a failure below can be read
+      # against the engine version that produced it, and compared with the pin
+      # in constraints-ci.txt that per-PR CI measured instead.
+      - name: Report the resolved engine version
+        run: |
+          resolved="$(python -c 'from importlib.metadata import version; print(version("carve-lang"))')"
+          pinned="$(sed -n 's/^carve-lang==\([^ ;#]*\).*/\1/p' constraints-ci.txt)"
+          echo "carve-lang resolved=${resolved}, while per-PR CI pins ${pinned}"
+
+      - name: Test
+        run: pytest -q
+
+      - name: Build a site through both seams
+        run: python tests/e2e_build.py

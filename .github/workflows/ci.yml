@@ -20,8 +20,24 @@ jobs:
         with:
           python-version: ${{ matrix.python }}
 
+      # Under `constraints-ci.txt`, so this job measures a stated engine rather
+      # than whatever PyPI serves at the moment it runs. See that file.
       - name: Install
-        run: pip install -e ".[dev]"
+        run: pip install -e ".[dev]" -c constraints-ci.txt
+
+      - name: Verify the engine this run measures
+        run: |
+          resolved="$(python -c 'from importlib.metadata import version; print(version("carve-lang"))')"
+          pinned="$(sed -n 's/^carve-lang==\([^ ;#]*\).*/\1/p' constraints-ci.txt)"
+          echo "carve-lang resolved=${resolved} pinned=${pinned}"
+          if [ -z "$pinned" ]; then
+            echo "::error::constraints-ci.txt names no carve-lang pin, so this run measured an unstated engine"
+            exit 1
+          fi
+          if [ "$resolved" != "$pinned" ]; then
+            echo "::error::installed carve-lang ${resolved} is not the pinned ${pinned}"
+            exit 1
+          fi
 
       - name: Test
         run: pytest -q
@@ -37,7 +53,23 @@ jobs:
           python-version: "3.12"
 
       - name: Install
-        run: pip install -e ".[dev]"
+        run: pip install -e ".[dev]" -c constraints-ci.txt
+
+      # This job renders a real site, so which engine drew it is the whole
+      # question when the output changes. Stated, not inferred.
+      - name: Verify the engine this run measures
+        run: |
+          resolved="$(python -c 'from importlib.metadata import version; print(version("carve-lang"))')"
+          pinned="$(sed -n 's/^carve-lang==\([^ ;#]*\).*/\1/p' constraints-ci.txt)"
+          echo "carve-lang resolved=${resolved} pinned=${pinned}"
+          if [ -z "$pinned" ]; then
+            echo "::error::constraints-ci.txt names no carve-lang pin, so this run measured an unstated engine"
+            exit 1
+          fi
+          if [ "$resolved" != "$pinned" ]; then
+            echo "::error::installed carve-lang ${resolved} is not the pinned ${pinned}"
+            exit 1
+          fi
 
       # The unit tests answer "does the package do what it says". This answers
       # the only question that matters to a user: does a real Zensical build
