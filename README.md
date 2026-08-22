@@ -372,10 +372,6 @@ happens to be next.
 - [carve-lang][carve-lang] - the Python binding this package renders with
 - [mkdocs-carve](https://github.com/markup-carve/mkdocs-carve) - the same idea for MkDocs
 
-## License
-
-MIT
-
 [carve]: https://markup-carve.github.io/carve/
 [carve-lang]: https://pypi.org/project/carve-lang/
 [zensical]: https://zensical.org/
