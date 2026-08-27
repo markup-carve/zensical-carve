@@ -34,4 +34,4 @@
 # the drift is noticed - a day after a release, in a run nobody's pull request
 # is waiting on. `release.yml` is unconstrained for the same reason: its gate
 # asks what a consumer gets, not what CI measured.
-carve-lang==0.1.1
+carve-lang==0.1.2

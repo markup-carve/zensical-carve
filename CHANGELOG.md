@@ -9,7 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- The Carve engine dependency is bounded: `carve-lang>=0.1.1,<0.2.0`. On the
+- The Carve engine dependency remains bounded at `carve-lang>=0.1.1,<0.2.0`;
+  release gates are pinned to current 0.1.2 while 0.1.1 remains a valid
+  supported floor. On the
   engine's own 0.x scheme `0.1` is the major, so the previous open range admitted
   breaking releases by the engine's own rules.
   markup-carve/zensical-carve#5
