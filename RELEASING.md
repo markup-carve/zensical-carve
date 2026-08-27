@@ -1,7 +1,7 @@
 # Releasing
 
 `zensical-carve` publishes to PyPI from `.github/workflows/release.yml`, which
-runs on a pushed `v*` tag.
+runs on a pushed bare SemVer tag (`X.Y.Z`).
 
 ## One-time setup
 
@@ -34,8 +34,8 @@ All of it happens outside this repository's files, and it has not been done yet
    either. carve-js shipped an exported constant reading 0.1.0 across three
    releases because only one of its two places was bumped
    (`markup-carve/carve-js#1074`).
-3. Tag `vX.Y.Z` and push the tag. The workflow matches `v*` - a bare `0.1.0` tag
-   lands and fires nothing.
+3. Tag `X.Y.Z` and push the tag. The workflow requires a bare SemVer tag such
+   as `0.1.0`.
 4. Write the release notes as a draft release on GitHub and publish it.
 
 ## What runs before anything is uploaded
