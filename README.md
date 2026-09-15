@@ -74,6 +74,23 @@ with the container gone - so converting the whole page would trade this set of
 flaws for a worse one. Admonitions, definition lists, tables with captions and
 every inline mark keep their fidelity.
 
+A `{.diff}` code block is the one exception among code blocks. Its per-line
+`+`/`-`/space markers cannot survive a Markdown fence, so it stays HTML: each
+line becomes a `<span class="line diff add|remove">` with a
+`<span class="diff-marker">`, on a `<pre class="... has-diff">`, matching the
+`markup-carve/carve-grammars` class contract. That forfeits the theme's syntax
+colors for the block, and - like Carve's `tabs` - the classes are Carve's own,
+so add a rule for them (Material has no diff styling of its own):
+
+``` css
+.md-typeset pre.has-diff .line { display: block; }
+.md-typeset pre.has-diff .line.diff.add { background: rgb(46 160 67 / 15%); }
+.md-typeset pre.has-diff .line.diff.remove { background: rgb(248 81 73 / 15%); }
+.md-typeset pre.has-diff .diff-marker { display: inline-block; width: 1ch; font-weight: 700; }
+.md-typeset pre.has-diff .line.diff.add .diff-marker { color: #1a7f37; }
+.md-typeset pre.has-diff .line.diff.remove .diff-marker { color: #cf222e; }
+```
+
 Pass `--raw-html` if you want the unadapted HTML anyway.
 
 Carve front matter is lifted rather than rendered:
