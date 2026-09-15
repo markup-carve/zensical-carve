@@ -90,6 +90,36 @@ def _markdown_code(pre_attrs: dict[str, str], code_attrs: dict[str, str], body: 
     return f"\n\n{head}\n{source.strip(chr(10))}\n{fence}\n\n"
 
 
+_DIFF_LINE_CLASS = {"+": "line diff add", "-": "line diff remove", " ": "line"}
+
+
+def _html_diff(pre_attrs: dict[str, str], code_attrs: dict[str, str], body: str) -> str:
+    """Present a `{.diff}` fence as HTML with the carve-grammars class contract.
+
+    Carve leaves each line's leading ``+``/``-``/space as text; here it becomes a
+    ``diff-marker`` span plus an add/remove line class, so the theme's own CSS (or
+    the user's - see the README) can render the diff. Highlighting is forfeited,
+    like the injected-markup branch: the theme's Pygments pipeline runs only on a
+    Markdown fence, which cannot carry the per-line markers.
+    """
+    pre_class = (pre_attrs.get("class", "") + " has-diff").strip()
+    pre_open = f'<pre class="{pre_class}"'
+    if title := pre_attrs.get("title"):
+        pre_open += f' title="{title}"'
+    pre_open += ">"
+    code_class = code_attrs.get("class", "")
+    code = body[:-1] if body.endswith("\n") else body
+    lines = []
+    for line in code.split("\n"):
+        marker = line[0] if line and line[0] in "+- " else ""
+        rest = line[1:] if marker else line
+        line_class = _DIFF_LINE_CLASS.get(marker, "line")
+        marker_span = f'<span class="diff-marker">{html.escape(marker)}</span>' if marker else ""
+        lines.append(f'<span class="{line_class}">{marker_span}{rest}</span>')
+    code_attr = f' class="{code_class}"' if code_class else ""
+    return f"\n\n{pre_open}<code{code_attr}>" + "\n".join(lines) + "</code></pre>\n\n"
+
+
 def _dedent(chunk: str) -> str:
     """Left-align an HTML chunk that used to sit inside a `<section>`.
 
@@ -160,6 +190,8 @@ def adapt(carve_html: str) -> str:
             )
         else:
             body = match.group("body")
+            pre_attrs = _attrs(match.group("pre_attrs"))
+            code_attrs = _attrs(match.group("code_attrs"))
             if _INJECTED_MARKUP.search(body):
                 # An extension has already put ELEMENTS inside this code block -
                 # code callouts do exactly that, emitting `<b class="callout">`
@@ -169,14 +201,12 @@ def adapt(carve_html: str) -> str:
                 # block stays HTML and forfeits the theme's highlighting, which
                 # is the cheaper of the two losses.
                 pieces.append(match.group(0))
+            elif "diff" in pre_attrs.get("class", "").split():
+                # A `{.diff}` fence carries per-line +/-/space markers a Markdown
+                # fence cannot express; present it as HTML instead.
+                pieces.append(_html_diff(pre_attrs, code_attrs, body))
             else:
-                pieces.append(
-                    _markdown_code(
-                        _attrs(match.group("pre_attrs")),
-                        _attrs(match.group("code_attrs")),
-                        body,
-                    )
-                )
+                pieces.append(_markdown_code(pre_attrs, code_attrs, body))
     pieces.append(out[position:])
     out = "".join(_dedent(piece) if not piece.startswith("\n\n") else piece for piece in pieces)
 

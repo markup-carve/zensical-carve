@@ -243,6 +243,35 @@ def test_a_code_block_holding_injected_markup_stays_html():
     assert "```rust" not in out
 
 
+def test_a_diff_fence_is_presented_as_html_with_the_marker_contract():
+    out = adapt(
+        '<pre class="diff"><code class="language-js">  keep();\n'
+        "- old();\n+ fresh();\n</code></pre>"
+    )
+    assert 'class="diff has-diff"' in out
+    assert 'class="line diff remove"><span class="diff-marker">-</span> old();' in out
+    assert 'class="line diff add"><span class="diff-marker">+</span> fresh();' in out
+    # A context line keeps its space marker and stays a plain line; the marker
+    # consumes the first column, so one of the two leading spaces remains.
+    assert 'class="line"><span class="diff-marker"> </span> keep();' in out
+    assert "```js" not in out
+
+
+def test_a_titled_diff_fence_keeps_its_title():
+    out = adapt(
+        '<pre class="diff" title="patch.js"><code class="language-js">'
+        "- old();\n</code></pre>"
+    )
+    assert 'class="diff has-diff" title="patch.js"' in out
+
+
+def test_a_class_that_only_contains_diff_as_a_substring_still_fences():
+    out = adapt('<pre class="diff-example"><code class="language-js">- old();\n</code></pre>')
+    assert "has-diff" not in out
+    assert "diff-marker" not in out
+    assert "```js" in out
+
+
 def test_an_ordinary_code_block_with_escaped_angle_brackets_still_fences():
     """`a &lt; b` is source, not markup, and must keep the theme's highlighting."""
     out = adapt('<pre><code class="language-c">if (a &lt; b) {}</code></pre>')
