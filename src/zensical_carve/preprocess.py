@@ -102,6 +102,7 @@ def convert(
     theme: bool = True,
     symbols: Mapping[str, str] | None = None,
     source_path: Path | None = None,
+    include_root: str | None = None,
     prerender: "prerender_module.Options | None" = None,
 ) -> str:
     """Render one Carve document into the text of a Markdown page.
@@ -113,7 +114,14 @@ def convert(
     integrated.
     """
     front_matter, _ = _split_front_matter(source)
-    html = render(source, extensions=extensions, symbols=symbols)
+    html = render(
+        source,
+        extensions=extensions,
+        symbols=symbols,
+        include_root=include_root,
+        source_path=_identity(source_path, include_root),
+        warn=_include_warner(source_path),
+    )
     if prerender is not None:
         html = prerender_module.apply(
             html,
@@ -138,6 +146,28 @@ def convert(
         head.append(f"{SOURCE_KEY}: {json.dumps(source_path.as_posix())}")
     head.append("---")
     return "\n".join(head) + "\n\n" + html.rstrip("\n") + "\n"
+
+
+def _identity(source_path: Path | None, include_root: str | None) -> str | None:
+    """The page's identity relative to the root, or ``None`` with no root.
+
+    Relative rather than absolute because the engine echoes back whatever it is
+    given for a document outside the root, and an absolute path there reaches a
+    build log. Inside the root the two are the same.
+    """
+    if source_path is None or include_root is None:
+        return None
+    return os.path.relpath(source_path, include_root)
+
+
+def _include_warner(source_path: Path | None):
+    """An include that did not expand says which page asked for it."""
+
+    def warn(message: str) -> None:
+        where = f"{source_path}: " if source_path is not None else ""
+        print(f"zensical-carve: {where}{message}", file=sys.stderr)
+
+    return warn
 
 
 def _warner(source_path: Path | None):
@@ -172,6 +202,7 @@ def convert_tree(
     force: bool = False,
     theme: bool = True,
     symbols: Mapping[str, str] | None = None,
+    include_root: str | None = None,
     prerender: "prerender_module.Options | None" = None,
 ) -> Outcome:
     """Render every ``.crv`` under ``docs_dir`` to a sibling ``.md``.
@@ -203,6 +234,7 @@ def convert_tree(
                 theme=theme,
                 symbols=symbols,
                 source_path=source_path,
+                include_root=include_root,
                 prerender=prerender,
             )
         except CarveError as error:
@@ -291,6 +323,17 @@ def _add_render_options(parser: argparse.ArgumentParser) -> None:
         help=f"the Kroki instance to render with (default: {prerender_module.KROKI_URL})",
     )
     parser.add_argument(
+        "--includes",
+        action="store_true",
+        help="expand `{{ path }}` includes, contained to the include root",
+    )
+    parser.add_argument(
+        "--include-root",
+        default=None,
+        metavar="DIR",
+        help="an absolute containment root for includes (default: the docs directory)",
+    )
+    parser.add_argument(
         "--force",
         action="store_true",
         help="overwrite a .md this tool did not generate",
@@ -317,6 +360,8 @@ def _resolve(args: argparse.Namespace) -> Settings:
         docs_dir=args.docs_dir,
         extensions=tuple(args.extensions) if args.extensions else None,
         emoji=args.emoji,
+        includes=args.includes,
+        include_root=args.include_root,
         force=args.force,
         raw_html=args.raw_html,
         prerender=tuple(args.prerender) if args.prerender else None,
@@ -389,12 +434,15 @@ def main(argv: Sequence[str] | None = None) -> int:
             )
             return 2
 
+    include_root = config.containment_root(settings)
+
     outcome = convert_tree(
         docs_dir,
         extensions=settings.extensions,
         force=settings.force,
         theme=not settings.raw_html,
         symbols=symbols,
+        include_root=include_root,
         prerender=prerender,
     )
 

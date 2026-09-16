@@ -41,6 +41,7 @@ else:  # pragma: no cover - exercised on 3.10 only
 __all__ = [
     "ConfigError",
     "Settings",
+    "containment_root",
     "encode",
     "find",
     "load",
@@ -88,6 +89,15 @@ class Settings:
     force: bool = False
     emoji: str = "none"
     symbols: dict[str, str] = field(default_factory=dict)
+    includes: bool = False
+    include_root: str = ""
+    """The containment root, as the site wrote it.
+
+    Kept a string rather than a ``Path`` because it reaches the engine
+    unchanged: the resolver refuses a relative root, and that refusal is what
+    keeps containment off the working directory. Empty means the default,
+    derived from ``docs_dir`` by :func:`containment_root`.
+    """
     prerender: tuple[str, ...] = ()
     prerender_url: str = ""
     prerender_command: dict[str, str] = field(default_factory=dict)
@@ -159,6 +169,8 @@ _READERS: dict[str, str] = {
     "raw-html": "raw_html",
     "emoji": "emoji",
     "symbols": "symbols",
+    "includes": "includes",
+    "include-root": "include_root",
     "prerender": "prerender",
     "prerender-url": "prerender_url",
     "prerender-command": "prerender_command",
@@ -196,6 +208,16 @@ def _value(name: str, raw: Any, source: Path) -> Any:
     if name == "raw_html":
         if not isinstance(raw, bool):
             raise ConfigError(f"{source}: raw-html must be true or false")
+        return raw
+
+    if name == "includes":
+        if not isinstance(raw, bool):
+            raise ConfigError(f"{source}: includes must be true or false")
+        return raw
+
+    if name == "include_root":
+        if not isinstance(raw, str):
+            raise ConfigError(f"{source}: include-root must be a string")
         return raw
 
     if name == "emoji":
@@ -270,6 +292,8 @@ def encode(settings: Settings) -> str:
             else None,
             "emoji": settings.emoji,
             "symbols": settings.symbols,
+            "includes": settings.includes,
+            "include_root": settings.include_root,
             "prerender": list(settings.prerender),
             "prerender_url": settings.prerender_url,
             "prerender_command": settings.prerender_command,
@@ -290,6 +314,8 @@ def _decode(raw: str) -> Settings:
         extensions=tuple(extensions) if extensions is not None else None,
         emoji=data.get("emoji", "none"),
         symbols=dict(data.get("symbols") or {}),
+        includes=bool(data.get("includes")),
+        include_root=data.get("include_root") or "",
         prerender=tuple(data.get("prerender") or ()),
         prerender_url=data.get("prerender_url") or "",
         prerender_command=dict(data.get("prerender_command") or {}),
@@ -323,3 +349,17 @@ def merge(settings: Settings, **overrides: Any) -> Settings:
     if not given:
         return settings
     return replace(settings, **given)
+
+
+def containment_root(settings: Settings) -> str | None:
+    """The root includes resolve within, or ``None`` when expansion is off.
+
+    A configured value is handed back as written, so the engine's refusal of a
+    relative root is what fires. Only the default is resolved, because it is
+    this package's own value rather than the site's.
+    """
+    if not settings.includes:
+        return None
+    if settings.include_root:
+        return settings.include_root
+    return str(settings.docs_dir.resolve())
