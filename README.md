@@ -135,6 +135,8 @@ that one run. `--config FILE` points at a file directly.
 | `prerender-url` | a Kroki instance, default `https://kroki.io` |
 | `prerender-command` | per-language command line, for a local binary |
 | `prerender-timeout` | seconds one diagram may take, default 60 |
+| `includes` | `true` to expand `{{ path }}` includes on whole pages, default `false` |
+| `include-root` | an absolute containment root, default the docs directory |
 
 **Changing a setting cleans Zensical's cache.** A rendered page is cached by
 Zensical's own inputs, and a Carve setting is not one of them - switching
@@ -159,13 +161,46 @@ render alike.
 Options: `--docs-dir` (default `docs`), `--config FILE`, `--extension NAME`
 (repeatable, enables a Carve extension), `--emoji none|unicode|twemoji`,
 `--symbols FILE.json`, `--prerender LANGUAGE` (repeatable), `--prerender-url
-URL`, `--force`, `--raw-html`. Each has a key in the
-configuration table above.
+URL`, `--includes`, `--include-root DIR`, `--force`, `--raw-html`. Each has a
+key in the configuration table above.
 
 A generated page carries `zensical_carve: generated` in its front matter. That
 marker is what `clean` deletes on, and what stops `prepare` from overwriting a
 page you wrote by hand - it reports and skips instead, unless you pass
 `--force`.
+
+### Includes
+
+A Carve page can pull another file in with `{{ path }}`. It stays literal until
+a site asks:
+
+``` toml
+[tool.zensical-carve]
+includes = true
+```
+
+Paths resolve relative to the file that wrote them, and nothing resolves outside
+the containment root. The root is the docs directory unless `include-root` names
+another one, and an include that would leave it is not expanded.
+
+`include-root` must be an **absolute** path. A relative one is refused rather
+than resolved, because resolving it lands on whatever directory the build ran
+from, which is not a root anyone chose.
+
+A target that cannot be read is reported against the page that asked for it, and
+the directive is left as written. The message does not say whether the file was
+missing or refused by containment: both report `include-unresolved`, so a page
+cannot be used to probe the filesystem. The class is printed on its own line for
+the build's log.
+
+**A fence does not expand, and says so.** A ` ```carve ` block has no file of its
+own for a relative path to resolve against. The block keeps its directive
+literal, and the build prints one line saying it did, so the two paths cannot
+diverge without a reader hearing about it.
+
+**Fragments under `docs/` become pages.** `prepare` walks every `.crv` it finds,
+so a fragment meant only to be included gets a `.md` of its own. Keep fragments
+outside the docs directory and point `include-root` at the tree above both.
 
 ### Two things to know
 

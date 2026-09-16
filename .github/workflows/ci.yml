@@ -42,6 +42,38 @@ jobs:
       - name: Test
         run: pytest -q
 
+  # `render_with_includes` is on carve-py main and in no published carve-lang,
+  # so the matrix job above skips every include test. This job is where they
+  # run: it installs the engine revision named in `constraints-includes.txt` and
+  # refuses to pass if the entry point is still missing, which is what stops the
+  # skip from reading as a green.
+  includes:
+    name: Includes, against an engine that has them
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+
+      - name: Install
+        run: |
+          pip install -e ".[dev]" -c constraints-ci.txt
+          pip install --force-reinstall -r constraints-includes.txt
+
+      - name: Verify the engine exposes the include entry point
+        run: |
+          python - <<'EOF'
+          import carve, sys
+          if not hasattr(carve, "render_with_includes"):
+              print("::error::installed carve-lang exposes no render_with_includes")
+              sys.exit(1)
+          EOF
+
+      - name: Test
+        run: pytest -q tests/test_includes.py
+
   build:
     name: End-to-end build with Zensical
     runs-on: ubuntu-latest

@@ -38,6 +38,9 @@ def render(
     *,
     extensions: Sequence[str] | None = None,
     symbols: Mapping[str, str] | None = None,
+    include_root: str | None = None,
+    source_path: str | None = None,
+    warn: "Any | None" = None,
 ) -> str:
     """Render Carve source to HTML.
 
@@ -50,6 +53,11 @@ def render(
             The engine substitutes the value RAW, so a value carrying markup
             reaches the page as markup - which is what the twemoji mode in
             :mod:`zensical_carve.symbols` relies on.
+        include_root: The containment root for `{{ path }}` includes, passed to
+            the engine as given. Without it, and without ``source_path``, a
+            directive stays literal.
+        source_path: The document's identity relative to ``include_root``.
+        warn: Called with one message per include the engine could not use.
 
     Returns:
         The rendered HTML.
@@ -71,10 +79,50 @@ def render(
     if symbols:
         options["symbols"] = dict(symbols)
 
+    if include_root is None or source_path is None:
+        try:
+            return carve.to_html(source, **options)
+        except Exception as error:
+            raise CarveError(f"Carve refused the document: {error}") from error
+
+    if not hasattr(carve, "render_with_includes"):
+        raise CarveError(
+            "the installed carve-lang exposes no render_with_includes;"
+            " upgrade the engine, or turn includes off"
+        )
     try:
-        return carve.to_html(source, **options)
+        result = carve.render_with_includes(
+            source, include_root, source_path=source_path, **options
+        )
     except Exception as error:
         raise CarveError(f"Carve refused the document: {error}") from error
+    if warn is not None:
+        _report_includes(result, warn)
+    return result["output"]
+
+
+def _report_includes(result: Mapping[str, Any], warn: Any) -> None:
+    """Hand every degraded include to ``warn``, with its class where there is one.
+
+    The engine reports a containment refusal and a missing file as the same
+    `include-unresolved` warning, so a page cannot probe the filesystem (spec
+    I7). Which one it was is on the dependency, and that is where this reads it
+    from - the sanitized warning is left as the engine wrote it.
+    """
+    denials = {
+        dependency["id"]: dependency["denial"]
+        for dependency in result["dependencies"]
+        if dependency["denial"]
+    }
+    for warning in result["warnings"]:
+        where = warning.get("file")
+        location = f"{where}: " if where else ""
+        warn(f"{location}{warning['rule']}: {warning['message']}")
+    suppressed = result["suppressed_warnings"]
+    if suppressed:
+        warn(f"{suppressed} further include warnings suppressed")
+    for identifier, denial in denials.items():
+        warn(f"include {identifier}: {denial}")
 
 
 def fence(
@@ -105,8 +153,15 @@ def fence(
     same one the whole-page path reads, so a block and a page render alike.
     There is nowhere else they could come from: superfences hands a fence its
     own options, and the fence line of a Carve block carries none.
+
+    Includes are read from that table too, and then not applied: a fence has no
+    file of its own for a relative path to resolve against. The one thing that
+    must not happen is applying them silently under some other identity, so the
+    block keeps its directive literal and the build says once that it did.
     """
     settings, symbol_map, prerender_options = _runtime()
+    if settings.includes:
+        _note_fence_includes()
     html = render(source, extensions=settings.extensions, symbols=symbol_map)
     if prerender_options is not None:
         from . import prerender
@@ -120,6 +175,16 @@ def fence(
             timeout=prerender_options.timeout,
         )
     return html
+
+
+@functools.lru_cache(maxsize=1)
+def _note_fence_includes() -> None:
+    """Said once per process, not once per block."""
+    print(
+        "zensical-carve: a carve fence has no source file, so `{{ path }}`"
+        " stays literal inside one; whole pages still expand",
+        file=sys.stderr,
+    )
 
 
 @functools.lru_cache(maxsize=1)

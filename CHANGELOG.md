@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Expand `{{ path }}` includes on whole pages, contained to a root, through new
+  `includes` and `include-root` settings (and `--includes` / `--include-root`).
+  Off by default. A ` ```carve ` fence has no file of its own, so it keeps the
+  directive literal and says so once per build. Needs an engine exposing
+  `carve.render_with_includes`, which no published `carve-lang` has yet.
+  markup-carve/zensical-carve#13
+
 ### Changed
 
 - The Carve engine dependency remains bounded at `carve-lang>=0.1.1,<0.2.0`;
