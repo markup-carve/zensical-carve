@@ -5,16 +5,25 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.1.1] - 2026-09-21
 
 ### Added
 
 - Expand `{{ path }}` includes on whole pages, contained to a root, through new
   `includes` and `include-root` settings (and `--includes` / `--include-root`).
-  Off by default. A ` ```carve ` fence has no file of its own, so it keeps the
-  directive literal and says so once per build. Needs an engine exposing
-  `carve.render_with_includes`, which no published `carve-lang` has yet.
-  markup-carve/zensical-carve#13
+  Off by default, and needs `carve-lang` 0.1.4 or newer, above the declared
+  floor. A ` ```carve ` fence has no file of its own, so it keeps the directive
+  literal and says so once per build. markup-carve/zensical-carve#13
+
+### Fixed
+
+- A `{.diff}` code block keeps its diff overlay. The theme adapter handed every
+  block back as a Markdown fence, which cannot carry the per-line markers, so
+  the block rendered as plain highlighted code. Such a block is presented as
+  HTML instead, which forfeits the theme's highlighting for it.
+  markup-carve/zensical-carve#12
+
+## [0.1.0] - 2026-08-27
 
 ### Changed
 
@@ -91,8 +100,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   bullet beside the checkbox. Headings and code blocks are emitted as Markdown
   for Zensical to handle; everything else stays as Carve's HTML. `--raw-html`
   restores the previous behavior.
-
-## [0.1.0]
 
 ### Added
 
