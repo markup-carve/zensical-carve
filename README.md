@@ -172,7 +172,7 @@ page you wrote by hand - it reports and skips instead, unless you pass
 ### Includes
 
 A Carve page can pull another file in with `{{ path }}`. It stays literal until
-a site asks:
+a site asks, and expansion needs `carve-lang` 0.1.4 or newer:
 
 ``` toml
 [tool.zensical-carve]
