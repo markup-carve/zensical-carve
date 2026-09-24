@@ -38,6 +38,7 @@ import tempfile
 import urllib.error
 import urllib.request
 from dataclasses import dataclass, field
+from html.parser import HTMLParser
 from pathlib import Path
 from typing import Mapping, Sequence
 
@@ -77,12 +78,99 @@ rejected rather than quietly skipped, so a typo and an unsupported language
 read differently.
 """
 
-_BLOCK = re.compile(
-    r"<pre class=\"(?P<language>[a-z0-9-]+)\">(?P<payload>.*?)</pre>",
-    re.DOTALL,
-)
-
 _XML_PROLOG = re.compile(r"<\?xml[^>]*\?>\s*|<!DOCTYPE[^>]*>\s*", re.IGNORECASE)
+
+
+@dataclass(frozen=True)
+class _Block:
+    """One element whose class names a language somebody asked to prerender."""
+
+    tag: str
+    language: str
+    start: int
+    payload_start: int
+    payload_end: int
+    end: int
+
+
+class _Finder(HTMLParser):
+    """Locate diagram blocks by their class, whatever else the tag carries.
+
+    A regex over the whole start tag is what broke here: it wanted
+    ``class`` and nothing else, so carve-lang 0.1.2 adding `role` and
+    `aria-label` made it match nothing - silently, because a block that never
+    matched takes no path that can report anything. Reading the tag as a tag
+    means an attribute added later is simply another attribute.
+
+    Elements that are not `pre` are collected too. The engine moving the
+    diagram onto a different tag is the next shape change of the same kind,
+    and :func:`apply` turns that one into a warning instead of a silent pass.
+    """
+
+    def __init__(self, wanted: set[str]) -> None:
+        super().__init__(convert_charrefs=False)
+        self._wanted = wanted
+        self.blocks: list[_Block] = []
+        self._markup = ""
+        self._lines: list[int] = []
+        self._open: list[tuple[str, int, int] | None] = []
+
+    def find(self, markup: str) -> list[_Block]:
+        self._markup = markup
+        self._lines = [0]
+        for line in markup.split("\n"):
+            self._lines.append(self._lines[-1] + len(line) + 1)
+        self.feed(markup)
+        self.close()
+        return sorted(self.blocks, key=lambda block: block.start)
+
+    def _offset(self) -> int:
+        line, column = self.getpos()
+        return self._lines[line - 1] + column
+
+    def _language(self, attrs: list[tuple[str, str | None]]) -> str | None:
+        for name, value in attrs:
+            if name.lower() != "class" or not value:
+                continue
+            for token in value.split():
+                if token in self._wanted:
+                    return token
+        return None
+
+    def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
+        language = self._language(attrs)
+        if tag != "pre":
+            if language is not None and not self._open:
+                start = self._offset()
+                self.blocks.append(_Block(tag, language, start, start, start, start))
+            return
+        if language is None or self._open:
+            # An unlabelled `pre`, or one nested in a block already claimed.
+            # Tracked either way, so its end tag closes the right element.
+            self._open.append(None)
+            return
+        start = self._offset()
+        self._open.append((language, start, start + len(self.get_starttag_text() or "")))
+
+    def handle_endtag(self, tag: str) -> None:
+        if tag != "pre" or not self._open:
+            return
+        entry = self._open.pop()
+        if entry is None:
+            return
+        language, start, payload_start = entry
+        payload_end = self._offset()
+        closing = self._markup.find(">", payload_end)
+        end = len(self._markup) if closing < 0 else closing + 1
+        self.blocks.append(
+            _Block("pre", language, start, payload_start, payload_end, end)
+        )
+
+    def handle_startendtag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
+        # `<pre class="mermaid"/>` holds no diagram, and the default handler
+        # would open and close it, recording an empty payload.
+        if tag != "pre":
+            self.handle_starttag(tag, attrs)
 
 
 def unsupported(options: "Options") -> list[str]:
@@ -180,21 +268,36 @@ def apply(
     commands = dict(commands or {})
     report = warn if callable(warn) else _print_warning
 
-    def replace(match: re.Match[str]) -> str:
-        language = match.group("language")
-        if language not in wanted:
-            return match.group(0)
-        source = html.unescape(match.group("payload"))
+    pieces: list[str] = []
+    cursor = 0
+    for block in _Finder(wanted).find(markup):
+        if block.tag != "pre":
+            # The class says diagram and the tag says otherwise, so the engine
+            # writes this block in a shape this package does not know how to
+            # replace. Saying so is the point: the failure this warning exists
+            # for went a month unreported because nothing said anything.
+            report(
+                f"{block.language}: the engine wrote <{block.tag}"
+                f' class="...{block.language}..."> where a <pre> was expected,'
+                " so nothing was prerendered"
+            )
+            continue
+        source = html.unescape(markup[block.payload_start : block.payload_end])
         try:
-            svg = _render(language, source, url, commands, cache, timeout)
+            svg = _render(block.language, source, url, commands, cache, timeout)
         except PrerenderError as error:
-            report(f"{language}: {error}")
-            return match.group(0)
-        return (
-            f'<div class="carve-diagram carve-diagram-{language}">{svg}</div>'
+            report(f"{block.language}: {error}")
+            continue
+        pieces.append(markup[cursor : block.start])
+        pieces.append(
+            f'<div class="carve-diagram carve-diagram-{block.language}">{svg}</div>'
         )
+        cursor = block.end
 
-    return _BLOCK.sub(replace, markup)
+    if not pieces:
+        return markup
+    pieces.append(markup[cursor:])
+    return "".join(pieces)
 
 
 def _print_warning(message: str) -> None:
