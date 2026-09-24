@@ -825,3 +825,84 @@ def test_output_that_does_not_end_the_svg_is_a_failure(tmp_path):
 
     assert out == html
     assert warnings and "no whole SVG" in warnings[0]
+
+
+# --- the block the ENGINE writes -------------------------------------------
+#
+# Every test above hands `apply` a `<pre>` this file wrote, which is why
+# carve-lang 0.1.2 adding `role` and `aria-label` to that tag passed a green
+# suite for a month: the matcher stopped finding anything, and the fixture it
+# was measured against could not change. These two assert on output from the
+# INSTALLED bindings, so the next attribute - or the next tag - is measured
+# here rather than on a reader's page. See issue #20.
+
+
+def _engine_diagram_html(language: str = "graphviz", source: str = "digraph{a->b}") -> str:
+    import carve
+
+    extensions = list(carve.extensions())
+    assert f"fenced-render-{language}" in extensions, (
+        f"the installed carve-lang has no fenced-render-{language} extension, "
+        f"so this test measured nothing: {extensions}"
+    )
+    return render(f"``` {language}\n{source}\n```\n", extensions=extensions)
+
+
+def test_a_diagram_from_the_installed_engine_becomes_a_picture(tmp_path):
+    """The load-bearing one: the producer is the engine, not this file."""
+    html = _engine_diagram_html()
+
+    out = prerender.apply(
+        html,
+        languages=("graphviz",),
+        commands={"graphviz": ECHO_SVG},
+        cache=tmp_path,
+    )
+
+    assert '<div class="carve-diagram carve-diagram-graphviz">' in out, (
+        f"nothing was prerendered in the engine's own output: {html!r}"
+    )
+    assert "<pre" not in out
+
+
+def test_the_installed_engine_still_writes_a_diagram_on_a_pre():
+    """Separates the two failure modes: a new attribute, or a new tag."""
+    html = _engine_diagram_html()
+
+    assert html.startswith("<pre "), html
+    assert 'class="graphviz"' in html, html
+
+
+def test_extra_attributes_on_the_block_do_not_hide_it(tmp_path):
+    """Any attribute, in any order, around the class that names the language."""
+    html = (
+        '<pre role="img" data-x="&gt;" class="theme mermaid" aria-label="mermaid">'
+        "flowchart LR\n  A --&gt; B</pre>"
+    )
+
+    out = prerender.apply(
+        html,
+        languages=("mermaid",),
+        commands={"mermaid": ECHO_SVG},
+        cache=tmp_path,
+    )
+
+    assert '<div class="carve-diagram carve-diagram-mermaid">' in out
+    assert "<pre" not in out
+
+
+def test_a_diagram_on_an_unexpected_tag_is_reported_not_silent(tmp_path):
+    """The next shape change of this kind must say something."""
+    warnings = []
+    html = '<figure class="mermaid" role="img">flowchart LR</figure>'
+
+    out = prerender.apply(
+        html,
+        languages=("mermaid",),
+        commands={"mermaid": ECHO_SVG},
+        cache=tmp_path,
+        warn=warnings.append,
+    )
+
+    assert out == html
+    assert warnings and "<figure" in warnings[0] and "<pre> was expected" in warnings[0]
