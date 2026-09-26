@@ -5,6 +5,23 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.2] - 2026-09-26
+
+### Fixes
+
+- Diagrams are drawn at build time again. The block matcher wanted the diagram
+  `<pre>` to carry a class attribute and nothing else, so the `role` and
+  `aria-label` the engine has written since carve-lang 0.1.2 matched nothing,
+  every diagram fell back to the reader's browser, and the build still reported
+  success. The tag is now read as a tag, so an attribute added later is just
+  another attribute. markup-carve/zensical-carve#21
+
+### Improvements
+
+- A block that names a prerender language on a tag other than `<pre>` is
+  reported instead of passed over, which is the next shape change of this kind
+  and the one nothing could see. markup-carve/zensical-carve#21
+
 ## [0.1.1] - 2026-09-21
 
 ### Added
