@@ -11,10 +11,13 @@ on:
 permissions:
   contents: read
 
+# Every job below carries a timeout-minutes bound. Without one a job inherits
+# GitHub's 360-minute default, and a stalled step can burn hours unnoticed.
 jobs:
   build:
     name: Build distributions
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
 
@@ -79,6 +82,7 @@ jobs:
   gate:
     name: A real site builds from the built wheel
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     needs: [build]
     steps:
       - uses: actions/checkout@v4
@@ -114,6 +118,7 @@ jobs:
   publish:
     name: Publish to PyPI
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     needs: [build, gate]
     if: startsWith(github.ref, 'refs/tags/')
     permissions:
