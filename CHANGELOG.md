@@ -18,6 +18,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Improvements
 
+- The engine CI measures moves from `carve-lang` 0.1.4 to 0.1.7, so a run
+  measures what PyPI serves rather than an engine three releases behind it. Four
+  renderings change with it, each visible on a built page: a cross-reference
+  whose target differs only in case stays literal text rather than resolving; a
+  named container whose metadata slot is not separated by a space opens the
+  container rather than rendering its opener as prose; explicit table body
+  counts are consumed into one `<tbody>` per count instead of leaking into the
+  page as a `body-rows` attribute on `<table>`; and a fence that is a
+  description body's own block gives an empty payload no content. The prerender
+  path is unaffected - a mermaid block comes out byte-identical across the four
+  releases. markup-carve/zensical-carve#25
+- `tests/test_rendering_rulings.py` holds the engine to those four by direction
+  rather than by a golden, and keeps the mermaid block's class-bearing `<pre>`
+  under measurement rather than memory. Nothing in the suite could see an
+  ordinary document construct change, so the daily unconstrained run stayed
+  green through three engine releases. markup-carve/zensical-carve#25
 - A block that names a prerender language on a tag other than `<pre>` is
   reported instead of passed over, which is the next shape change of this kind
   and the one nothing could see. markup-carve/zensical-carve#21
