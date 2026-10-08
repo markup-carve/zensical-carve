@@ -34,4 +34,14 @@
 # the drift is noticed - a day after a release, in a run nobody's pull request
 # is waiting on. `release.yml` is unconstrained for the same reason: its gate
 # asks what a consumer gets, not what CI measured.
-carve-lang==0.1.4
+#
+# THAT ONLY WORKS AS FAR AS THE SUITE CAN SEE. This pin sat at 0.1.4 while
+# 0.1.5, 0.1.6 and 0.1.7 published, the unconstrained daily run was green every
+# day, and four boundary shapes rendered differently the whole time - all 94
+# tests pass on 0.1.4 and on 0.1.7. The prerender path, which is what broke the
+# last time a shape moved, is clean across the four releases: a mermaid block
+# comes out byte-identical and `tests/e2e_build.py` builds a real site on both.
+# The four that moved are ordinary document constructs, and
+# `tests/test_rendering_rulings.py` is what gives the canary something to fail
+# on.
+carve-lang==0.1.7
