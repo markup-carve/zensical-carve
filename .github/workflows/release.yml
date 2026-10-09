@@ -1,9 +1,6 @@
 name: Release
 
 on:
-  push:
-    tags:
-      - "[0-9]+.[0-9]+.[0-9]+"
   # So the whole path can be exercised before a tag is spent. A dispatched run
   # builds and gates; it never publishes, because `publish` needs a tag.
   workflow_dispatch:
