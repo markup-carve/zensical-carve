@@ -7,16 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.3] - 2026-10-23
+
 ### Improvements
 
 - New `zensical-carve lint` command reports lint findings on every `.crv` page
   and exits 1 when there are any. With `lint = true` or `--lint`, `prepare` and
   `build` print the findings as warnings, and `build -- --strict` stops before
-  Zensical runs.
+  Zensical runs. markup-carve/zensical-carve#31
 - `extensions` entries can carry options, written as
   `{ name = { option = value } }`. They reach whole pages and ` ```carve `
-  fences alike.
+  fences alike. markup-carve/zensical-carve#31
 - The engine CI measures moves from `carve-lang` 0.1.7 to 0.1.9.
+  markup-carve/zensical-carve#31
 
 ## [0.1.2] - 2026-10-08
 
