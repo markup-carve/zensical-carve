@@ -126,7 +126,8 @@ that one run. `--config FILE` points at a file directly.
 
 | key | what it takes |
 | --- | --- |
-| `extensions` | list of Carve extension names |
+| `extensions` | list of Carve extension names; an entry `{ name = { option = value } }` also sets that extension's options |
+| `lint` | `true` to report lint findings on every page while preparing, default `false` |
 | `emoji` | `none` (default), `unicode`, or `twemoji` |
 | `symbols` | inline table, or a path to a JSON object, mapping a name to what `:name:` renders as |
 | `docs-dir` | the directory to walk, default `docs` |
@@ -137,6 +138,21 @@ that one run. `--config FILE` points at a file directly.
 | `prerender-timeout` | seconds one diagram may take, default 60 |
 | `includes` | `true` to expand `{{ path }}` includes on whole pages, default `false` |
 | `include-root` | an absolute containment root, default the docs directory |
+
+Options go to the engine as written, and an unknown option fails the page that
+uses it with a message naming the options the extension accepts:
+
+``` toml
+[tool.zensical-carve]
+extensions = [
+  "details",
+  { wikilinks = { css_class = "wiki", new_window = true } },
+  { heading-permalinks = { symbol = "#" } },
+]
+```
+
+`--extension` on the command line replaces the list, options included. Options
+need carve-lang 0.1.2 or newer.
 
 **Changing a setting cleans Zensical's cache.** A rendered page is cached by
 Zensical's own inputs, and a Carve setting is not one of them - switching
@@ -157,12 +173,22 @@ render alike.
 | `zensical-carve prepare` | render every `.crv` under `docs/` to a sibling `.md` |
 | `zensical-carve build` | `prepare`, then run `zensical build`; extra arguments pass through |
 | `zensical-carve clean` | delete the generated pages, and only those |
+| `zensical-carve lint` | report lint findings on every `.crv` page; exit 1 when there are any |
 
 Options: `--docs-dir` (default `docs`), `--config FILE`, `--extension NAME`
 (repeatable, enables a Carve extension), `--emoji none|unicode|twemoji`,
 `--symbols FILE.json`, `--prerender LANGUAGE` (repeatable), `--prerender-url
-URL`, `--includes`, `--include-root DIR`, `--force`, `--raw-html`. Each has a
-key in the configuration table above.
+URL`, `--includes`, `--include-root DIR`, `--lint`, `--force`, `--raw-html`.
+Each has a key in the configuration table above. `lint` takes `--docs-dir`,
+`--config` and `--extension`.
+
+With `lint` on, `prepare` and `build` print each finding as
+`zensical-carve: WARNING: docs/page.crv:3:1: unattached-block-attribute: ...`
+and carry on. Zensical's strict mode cannot see those lines, because they are
+printed before it starts, so `zensical-carve build -- --strict` (or `-s`)
+checks them itself and exits 1 before running `zensical build`. The linter
+reads the page source before includes are expanded. A ` ```carve ` block inside
+a Markdown page is not linted.
 
 A generated page carries `zensical_carve: generated` in its front matter. That
 marker is what `clean` deletes on, and what stops `prepare` from overwriting a

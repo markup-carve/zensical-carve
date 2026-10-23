@@ -24,7 +24,7 @@ import functools
 import sys
 from typing import Any, Mapping, Sequence
 
-__all__ = ["__version__", "CarveError", "fence", "render"]
+__all__ = ["__version__", "CarveError", "fence", "lint", "render"]
 
 __version__ = "0.1.2"
 
@@ -37,6 +37,7 @@ def render(
     source: str,
     *,
     extensions: Sequence[str] | None = None,
+    extension_options: Mapping[str, Mapping[str, Any]] | None = None,
     symbols: Mapping[str, str] | None = None,
     include_root: str | None = None,
     source_path: str | None = None,
@@ -49,6 +50,8 @@ def render(
         extensions: Optional Carve extension names. An empty sequence and
             ``None`` are different: ``None`` means "use the engine default",
             an empty sequence means "no extensions".
+        extension_options: Options per extension name. Options for a name
+            not in ``extensions`` are dropped, because the engine refuses them.
         symbols: Optional map from a `:name:` symbol to what it renders as.
             The engine substitutes the value RAW, so a value carrying markup
             reaches the page as markup - which is what the twemoji mode in
@@ -76,6 +79,13 @@ def render(
     options: dict[str, Any] = {}
     if extensions is not None:
         options["extensions"] = list(extensions)
+        configured = {
+            name: dict(value)
+            for name, value in (extension_options or {}).items()
+            if name in extensions
+        }
+        if configured:
+            options["extension_options"] = configured
     if symbols:
         options["symbols"] = dict(symbols)
 
@@ -99,6 +109,26 @@ def render(
     if warn is not None:
         _report_includes(result, warn)
     return result["output"]
+
+
+def lint(source: str, *, extensions: Sequence[str] | None = None) -> list[dict[str, Any]]:
+    """The engine's lint findings for one Carve document.
+
+    Each finding is a dict with ``line``, ``column``, ``rule`` and ``message``.
+
+    Raises:
+        CarveError: if the installed engine has no linter.
+    """
+    try:
+        import carve
+    except ImportError as error:  # pragma: no cover - exercised by hand
+        raise CarveError("the carve-lang package is required to lint Carve") from error
+    if not hasattr(carve, "lint"):
+        raise CarveError("the installed carve-lang exposes no lint; upgrade the engine")
+    try:
+        return carve.lint(source, extensions=list(extensions) if extensions else None)
+    except Exception as error:
+        raise CarveError(f"Carve refused the document: {error}") from error
 
 
 def _report_includes(result: Mapping[str, Any], warn: Any) -> None:
@@ -162,7 +192,12 @@ def fence(
     settings, symbol_map, prerender_options = _runtime()
     if settings.includes:
         _note_fence_includes()
-    html = render(source, extensions=settings.extensions, symbols=symbol_map)
+    html = render(
+        source,
+        extensions=settings.extensions,
+        extension_options=settings.extension_options,
+        symbols=symbol_map,
+    )
     if prerender_options is not None:
         from . import prerender
 
