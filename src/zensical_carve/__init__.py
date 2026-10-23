@@ -26,7 +26,7 @@ from typing import Any, Mapping, Sequence
 
 __all__ = ["__version__", "CarveError", "fence", "lint", "render"]
 
-__version__ = "0.1.2"
+__version__ = "0.1.3"
 
 
 class CarveError(RuntimeError):
