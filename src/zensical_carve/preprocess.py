@@ -35,7 +35,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Iterable, Mapping, Sequence
 
-from . import CarveError, config, prerender as prerender_module, render, symbols as symbol_module
+from . import CarveError, config, lint, prerender as prerender_module, render, symbols as symbol_module
 from .config import ConfigError, Settings
 from .theme import adapt
 
@@ -46,6 +46,7 @@ __all__ = [
     "convert",
     "convert_tree",
     "clean_tree",
+    "lint_tree",
     "main",
 ]
 
@@ -79,6 +80,8 @@ class Outcome:
     written: list[Path] = field(default_factory=list)
     skipped: list[Path] = field(default_factory=list)
     failed: list[tuple[Path, str]] = field(default_factory=list)
+    findings: list[str] = field(default_factory=list)
+    """Lint findings, one ``path:line:column: rule: message`` line each."""
 
     def __bool__(self) -> bool:  # pragma: no cover - convenience only
         return bool(self.written)
@@ -99,6 +102,7 @@ def convert(
     source: str,
     *,
     extensions: Sequence[str] | None = None,
+    extension_options: Mapping[str, Mapping[str, object]] | None = None,
     theme: bool = True,
     symbols: Mapping[str, str] | None = None,
     source_path: Path | None = None,
@@ -117,6 +121,7 @@ def convert(
     html = render(
         source,
         extensions=extensions,
+        extension_options=extension_options,
         symbols=symbols,
         include_root=include_root,
         source_path=_identity(source_path, include_root),
@@ -199,11 +204,13 @@ def convert_tree(
     docs_dir: Path,
     *,
     extensions: Sequence[str] | None = None,
+    extension_options: Mapping[str, Mapping[str, object]] | None = None,
     force: bool = False,
     theme: bool = True,
     symbols: Mapping[str, str] | None = None,
     include_root: str | None = None,
     prerender: "prerender_module.Options | None" = None,
+    lint_pages: bool = False,
 ) -> Outcome:
     """Render every ``.crv`` under ``docs_dir`` to a sibling ``.md``.
 
@@ -228,9 +235,13 @@ def convert_tree(
             outcome.skipped.append(target)
             continue
         try:
+            source = source_path.read_text(encoding="utf-8")
+            if lint_pages:
+                outcome.findings.extend(_findings(source_path, source, extensions))
             text = convert(
-                source_path.read_text(encoding="utf-8"),
+                source,
                 extensions=extensions,
+                extension_options=extension_options,
                 theme=theme,
                 symbols=symbols,
                 source_path=source_path,
@@ -258,6 +269,31 @@ def convert_tree(
             outcome.failed.append((source_path, f"could not write {target}: {error}"))
             continue
         outcome.written.append(target)
+    return outcome
+
+
+def _findings(path: Path, source: str, extensions: Sequence[str] | None) -> list[str]:
+    return [
+        f"{path}:{item['line']}:{item['column']}: {item['rule']}: {item['message']}"
+        for item in lint(source, extensions=extensions)
+    ]
+
+
+def lint_tree(
+    docs_dir: Path, *, extensions: Sequence[str] | None = None
+) -> Outcome:
+    """Lint every ``.crv`` under ``docs_dir`` without writing anything."""
+    outcome = Outcome()
+    for source_path in _sources(docs_dir):
+        try:
+            source = source_path.read_text(encoding="utf-8")
+            outcome.findings.extend(_findings(source_path, source, extensions))
+        except (CarveError, OSError) as error:
+            outcome.failed.append((source_path, str(error)))
+        except UnicodeDecodeError as error:
+            outcome.failed.append(
+                (source_path, f"not valid UTF-8 ({error.reason} at byte {error.start})")
+            )
     return outcome
 
 
@@ -334,6 +370,11 @@ def _add_render_options(parser: argparse.ArgumentParser) -> None:
         help="an absolute containment root for includes (default: the docs directory)",
     )
     parser.add_argument(
+        "--lint",
+        action="store_true",
+        help="report lint findings on every .crv page as warnings",
+    )
+    parser.add_argument(
         "--force",
         action="store_true",
         help="overwrite a .md this tool did not generate",
@@ -350,7 +391,10 @@ def _resolve(args: argparse.Namespace) -> Settings:
     """File first, then the flags that were actually passed."""
     settings = config.load(args.config)
     extra: dict[str, object] = {}
-    if args.symbols is not None:
+    if getattr(args, "extensions", None):
+        # The flag replaces the configured list, options included.
+        extra["extension_options"] = {}
+    if getattr(args, "symbols", None) is not None:
         extra["symbols"] = {
             **settings.symbols,
             **config.read_symbols(args.symbols),
@@ -359,13 +403,14 @@ def _resolve(args: argparse.Namespace) -> Settings:
         settings,
         docs_dir=args.docs_dir,
         extensions=tuple(args.extensions) if args.extensions else None,
-        emoji=args.emoji,
-        includes=args.includes,
-        include_root=args.include_root,
-        force=args.force,
-        raw_html=args.raw_html,
-        prerender=tuple(args.prerender) if args.prerender else None,
-        prerender_url=args.prerender_url,
+        lint=getattr(args, "lint", False),
+        emoji=getattr(args, "emoji", None),
+        includes=getattr(args, "includes", False),
+        include_root=getattr(args, "include_root", None),
+        force=getattr(args, "force", False),
+        raw_html=getattr(args, "raw_html", False),
+        prerender=tuple(args.prerender) if getattr(args, "prerender", None) else None,
+        prerender_url=getattr(args, "prerender_url", None),
         **extra,
     )
 
@@ -384,6 +429,18 @@ def main(argv: Sequence[str] | None = None) -> int:
 
     clean = sub.add_parser("clean", help="delete the generated .md pages")
     _add_common(clean)
+
+    lint_parser = sub.add_parser(
+        "lint", help="report lint findings on every .crv page; exit 1 on any"
+    )
+    _add_common(lint_parser)
+    lint_parser.add_argument(
+        "--extension",
+        action="append",
+        dest="extensions",
+        metavar="NAME",
+        help="enable a Carve extension; repeat for several",
+    )
 
     build = sub.add_parser("build", help="prepare, then run `zensical build`")
     _add_common(build)
@@ -416,6 +473,14 @@ def main(argv: Sequence[str] | None = None) -> int:
     if settings.source is not None:
         print(f"zensical-carve: settings from {settings.source}")
 
+    if args.command == "lint":
+        checked = lint_tree(docs_dir, extensions=settings.extensions)
+        for line in checked.findings:
+            print(f"zensical-carve: {line}", file=sys.stderr)
+        for path, message in checked.failed:
+            print(f"zensical-carve: {path}: {message}", file=sys.stderr)
+        return 1 if checked.findings or checked.failed else 0
+
     try:
         symbols = symbol_module.build(settings.emoji, settings.symbols)
     except ValueError as error:  # pragma: no cover - choices() guards the CLI
@@ -439,6 +504,8 @@ def main(argv: Sequence[str] | None = None) -> int:
     outcome = convert_tree(
         docs_dir,
         extensions=settings.extensions,
+        extension_options=settings.extension_options,
+        lint_pages=settings.lint,
         force=settings.force,
         theme=not settings.raw_html,
         symbols=symbols,
@@ -450,6 +517,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         print(f"wrote {path}")
     for path, message in outcome.failed:
         print(f"zensical-carve: {path}: {message}", file=sys.stderr)
+    for line in outcome.findings:
+        print(f"zensical-carve: WARNING: {line}", file=sys.stderr)
 
     if outcome.failed:
         return 1
@@ -464,6 +533,15 @@ def main(argv: Sequence[str] | None = None) -> int:
         return 0
 
     rest = [item for item in args.rest if item != "--"]
+    # Zensical's strict mode cannot see these warnings, because they are
+    # printed before it starts, so honor its flag here.
+    if outcome.findings and ("--strict" in rest or "-s" in rest):
+        print(
+            f"zensical-carve: aborted with {len(outcome.findings)} lint warnings"
+            " in strict mode",
+            file=sys.stderr,
+        )
+        return 1
     # The fence runs inside `zensical build`, in another process, and would
     # otherwise re-read the file and lose every flag passed here - so a block
     # and a page in one build could render differently.

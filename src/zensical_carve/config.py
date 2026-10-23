@@ -85,6 +85,9 @@ class Settings:
 
     docs_dir: Path = Path("docs")
     extensions: tuple[str, ...] | None = None
+    extension_options: dict[str, dict[str, Any]] = field(default_factory=dict)
+    """Options per extension name, from a ``{ name = { ... } }`` entry."""
+    lint: bool = False
     raw_html: bool = False
     force: bool = False
     emoji: str = "none"
@@ -166,6 +169,7 @@ def load(path: Path | None = None, *, start: Path | None = None) -> Settings:
 _READERS: dict[str, str] = {
     "docs-dir": "docs_dir",
     "extensions": "extensions",
+    "lint": "lint",
     "raw-html": "raw_html",
     "emoji": "emoji",
     "symbols": "symbols",
@@ -190,8 +194,37 @@ def _settings(table: Mapping[str, Any], source: Path) -> Settings:
                 f"{source}: unknown key '{key}' in [tool.zensical-carve]"
                 f" (known keys: {known})"
             )
+        if name == "extensions":
+            values["extensions"], values["extension_options"] = _extensions(raw, source)
+            continue
         values[name] = _value(name, raw, source)
     return Settings(**values)
+
+
+def _extensions(
+    raw: Any, source: Path
+) -> tuple[tuple[str, ...], dict[str, dict[str, Any]]]:
+    """Names, plus the options of every ``{ name = { option = value } }`` entry."""
+    if not isinstance(raw, list):
+        raise ConfigError(f"{source}: extensions must be a list")
+    names: list[str] = []
+    options: dict[str, dict[str, Any]] = {}
+    for entry in raw:
+        if isinstance(entry, str):
+            names.append(entry)
+            continue
+        if not isinstance(entry, Mapping) or len(entry) != 1:
+            raise ConfigError(
+                f"{source}: an extensions entry is a name, or a table holding"
+                " one name and its options"
+            )
+        ((name, value),) = entry.items()
+        if not isinstance(value, Mapping):
+            raise ConfigError(f"{source}: extensions: options for '{name}' must be a table")
+        names.append(name)
+        if value:
+            options[name] = dict(value)
+    return tuple(names), options
 
 
 def _value(name: str, raw: Any, source: Path) -> Any:
@@ -200,10 +233,10 @@ def _value(name: str, raw: Any, source: Path) -> Any:
             raise ConfigError(f"{source}: docs-dir must be a string")
         return Path(raw)
 
-    if name == "extensions":
-        if not isinstance(raw, list) or not all(isinstance(x, str) for x in raw):
-            raise ConfigError(f"{source}: extensions must be a list of strings")
-        return tuple(raw)
+    if name == "lint":
+        if not isinstance(raw, bool):
+            raise ConfigError(f"{source}: lint must be true or false")
+        return raw
 
     if name == "raw_html":
         if not isinstance(raw, bool):
@@ -290,6 +323,8 @@ def encode(settings: Settings) -> str:
             "extensions": list(settings.extensions)
             if settings.extensions is not None
             else None,
+            "extension_options": settings.extension_options,
+            "lint": settings.lint,
             "emoji": settings.emoji,
             "symbols": settings.symbols,
             "includes": settings.includes,
@@ -312,6 +347,8 @@ def _decode(raw: str) -> Settings:
     extensions = data.get("extensions")
     return Settings(
         extensions=tuple(extensions) if extensions is not None else None,
+        extension_options=dict(data.get("extension_options") or {}),
+        lint=bool(data.get("lint")),
         emoji=data.get("emoji", "none"),
         symbols=dict(data.get("symbols") or {}),
         includes=bool(data.get("includes")),

@@ -65,9 +65,27 @@ emoji = "twemoji"
 docs-dir = "docs"
 ```
 
+An extension that takes options is written as an inline table, and
+`lint = true` reports lint findings while pages are prepared:
+
+```toml
+[tool.zensical-carve]
+extensions = ["details", { wikilinks = { css_class = "wiki", new_window = true } }]
+lint = true
+```
+
 Command-line flags override the file. Configuration also controls symbol maps,
 raw HTML, diagram prerendering, and the Kroki endpoint. The default public
 Kroki service receives diagram source; use a private endpoint when needed.
+
+## Lint
+
+`zensical-carve lint` reports constructs that parse and render but not the way
+the author meant (a block attribute that attaches to nothing, a reference link
+with no definition) on every `.crv` page, and exits 1 when it finds any. With
+`lint = true` or `--lint`, `prepare` and `build` print the same findings as
+warnings, and `zensical-carve build -- --strict` stops before Zensical runs.
+Lint needs carve-lang 0.1.2 or newer.
 
 ## Includes and build output
 
