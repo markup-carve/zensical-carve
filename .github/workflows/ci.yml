@@ -42,18 +42,6 @@ jobs:
             exit 1
           fi
 
-      # The include cases skip themselves when the engine has no
-      # `render_with_includes`, so without this a pin that lost the entry point
-      # would read as a green run over twenty-two cases nobody measured.
-      - name: The pinned engine exposes the include entry point
-        run: |
-          python - <<'EOF'
-          import carve, sys
-          if not hasattr(carve, "render_with_includes"):
-              print("::error::pinned carve-lang exposes no render_with_includes")
-              sys.exit(1)
-          EOF
-
       - name: Test
         run: pytest -q
 

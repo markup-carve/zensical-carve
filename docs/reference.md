@@ -151,8 +151,7 @@ extensions = [
 ]
 ```
 
-`--extension` on the command line replaces the list, options included. Options
-need carve-lang 0.1.2 or newer.
+`--extension` on the command line replaces the list, options included.
 
 **Changing a setting cleans Zensical's cache.** A rendered page is cached by
 Zensical's own inputs, and a Carve setting is not one of them - switching
@@ -180,15 +179,27 @@ Options: `--docs-dir` (default `docs`), `--config FILE`, `--extension NAME`
 `--symbols FILE.json`, `--prerender LANGUAGE` (repeatable), `--prerender-url
 URL`, `--includes`, `--include-root DIR`, `--lint`, `--force`, `--raw-html`.
 Each has a key in the configuration table above. `lint` takes `--docs-dir`,
-`--config` and `--extension`.
+`--config`, `--extension`, `--includes` and `--include-root`.
 
 With `lint` on, `prepare` and `build` print each finding as
 `zensical-carve: WARNING: docs/page.crv:3:1: unattached-block-attribute: ...`
 and carry on. Zensical's strict mode cannot see those lines, because they are
 printed before it starts, so `zensical-carve build -- --strict` (or `-s`)
-checks them itself and exits 1 before running `zensical build`. The linter
-reads the page source before includes are expanded. A ` ```carve ` block inside
-a Markdown page is not linted.
+checks them itself and exits 1 before running `zensical build`. A ` ```carve `
+block inside a Markdown page is not linted.
+
+With includes on, the linter follows them and checks every included Carve file
+too. A finding inside one names the page, the included file and the include
+site:
+
+```
+zensical-carve: WARNING: docs/page.crv: parts/frag.crv:3:1: unattached-block-attribute: ... (included at page.crv:3:1)
+```
+
+During `prepare` and `build` an include that cannot be expanded is reported
+once, by the include warning, and not again by the linter. `zensical-carve
+lint` renders nothing, so there it reports such an include (`include-unresolved`,
+`include-non-text`) as a finding and exits 1.
 
 A generated page carries `zensical_carve: generated` in its front matter. That
 marker is what `clean` deletes on, and what stops `prepare` from overwriting a
@@ -198,7 +209,7 @@ page you wrote by hand - it reports and skips instead, unless you pass
 ### Includes
 
 A Carve page can pull another file in with `{{ path }}`. It stays literal until
-a site asks, and expansion needs `carve-lang` 0.1.4 or newer:
+a site asks:
 
 ``` toml
 [tool.zensical-carve]
