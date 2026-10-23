@@ -27,12 +27,11 @@ dependencies = [
   # The Carve engine (the PyO3 binding over carve-rs).
   #
   # The floor is a claim about the oldest engine this package works with, not a
-  # formality: 0.1.0 renders `srcset="safe.png 1x, javascript:alert(1) 2x"`
-  # unsanitized, because a list-valued URL attribute was probed only on its
-  # first entry, and 0.1.1 carries the fix. Measured through this package's own
-  # `render` - see tests/test_engine_floor.py, which is what will report a
-  # future engine regressing it. The floor moves when an older engine stops
-  # working, not because a newer one exists.
+  # formality. It is 0.1.10 because that is the first release whose `lint`
+  # takes an include root, which `lint` with includes relies on. (0.1.0 was
+  # also unsafe: it rendered `srcset="safe.png 1x, javascript:alert(1) 2x"`
+  # unsanitized, see tests/test_engine_floor.py.) The floor moves when an older
+  # engine stops working, not because a newer one exists.
   #
   # The ceiling follows from the engine's own versioning rather than from a
   # judgement about its API: on this org's 0.x line `0.1` is the major and the
@@ -44,7 +43,7 @@ dependencies = [
   #
   # A range is the right shape for a consumer and the wrong one for a test run,
   # so CI installs under `constraints-ci.txt` instead. See that file.
-  "carve-lang>=0.1.1,<0.2.0",
+  "carve-lang>=0.1.10,<0.2.0",
   "tomli>=2.0; python_version < '3.11'",
 ]
 

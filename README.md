@@ -85,12 +85,13 @@ the author meant (a block attribute that attaches to nothing, a reference link
 with no definition) on every `.crv` page, and exits 1 when it finds any. With
 `lint = true` or `--lint`, `prepare` and `build` print the same findings as
 warnings, and `zensical-carve build -- --strict` stops before Zensical runs.
-Lint needs carve-lang 0.1.2 or newer.
+With includes on, the linter also checks every included Carve file and names
+the include site of each finding there.
 
 ## Includes and build output
 
 Includes are off by default. Enable them with `includes = true` or
-`--includes`; this requires carve-lang 0.1.4 or newer. Carve fences inside
+`--includes`. Carve fences inside
 Markdown pages never expand includes. Generated pages record their source and
 a generated marker.
 

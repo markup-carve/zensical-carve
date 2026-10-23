@@ -1,27 +1,14 @@
-"""One include policy, read from one table, for pages and for fences.
-
-These need an engine that exposes ``carve.render_with_includes``, which
-carve-lang carries from 0.1.4. The skip below is for a run against the declared
-floor, which is older; CI installs under ``constraints-ci.txt`` and asserts the
-entry point is there, so a skip cannot pass for a measurement.
-"""
+"""One include policy, read from one table, for pages and for fences."""
 
 from __future__ import annotations
 
 import os
 from pathlib import Path
 
-import carve
 import pytest
 
 import zensical_carve
 from zensical_carve import CarveError, config, preprocess
-
-pytestmark = pytest.mark.skipif(
-    not hasattr(carve, "render_with_includes"),
-    reason="installed carve-lang exposes no render_with_includes",
-)
-
 
 @pytest.fixture()
 def site(tmp_path):

@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Improvements
+
+- With includes on, lint follows them and checks every included Carve file. A
+  finding there names the page, the included file and the include site. The
+  `lint` command takes `--includes` and `--include-root`, and reports an
+  include it cannot expand as a finding.
+- The declared engine floor rises from `carve-lang` 0.1.1 to 0.1.10, the first
+  release whose linter follows includes. CI measures 0.1.10.
+
 ## [0.1.3] - 2026-10-23
 
 ### Improvements

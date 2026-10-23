@@ -219,3 +219,68 @@ def test_an_extension_flag_drops_the_configured_options(tmp_path, monkeypatch):
     body = (docs / "page.md").read_text(encoding="utf-8")
     assert 'class="wikilink"' in body
     assert 'class="wl"' not in body
+
+
+# --- lint across includes --------------------------------------------------
+
+
+def _include_site(tmp_path: Path, includes: bool = True) -> Path:
+    docs = tmp_path / "docs"
+    (docs / "parts").mkdir(parents=True)
+    (docs / "parts" / "frag.txt").write_text(UNATTACHED, encoding="utf-8")
+    (docs / "page.crv").write_text(
+        "Intro.\n\n{{ parts/frag.txt }}\n\n{{ missing.txt }}\n", encoding="utf-8"
+    )
+    if includes:
+        _write(tmp_path / "zensical.toml", "[tool.zensical-carve]\nincludes = true\n")
+    return docs
+
+
+def test_lint_follows_includes_and_names_the_include_site(tmp_path, capsys, monkeypatch):
+    _include_site(tmp_path)
+    monkeypatch.chdir(tmp_path)
+    assert main(["lint"]) == 1
+    err = capsys.readouterr().err
+    assert (
+        "page.crv: parts/frag.txt:3:1: unattached-block-attribute: " in err
+        and "(included at page.crv:3:1)" in err
+    ), err
+    assert "page.crv:5:1: include-unresolved" in err
+
+
+def test_lint_without_includes_does_not_open_included_files(tmp_path, capsys, monkeypatch):
+    _include_site(tmp_path, includes=False)
+    monkeypatch.chdir(tmp_path)
+    assert main(["lint"]) == 0
+    assert "frag.txt" not in capsys.readouterr().err
+
+
+def test_the_lint_includes_flag_turns_following_on(tmp_path, capsys, monkeypatch):
+    _include_site(tmp_path, includes=False)
+    monkeypatch.chdir(tmp_path)
+    assert main(["lint", "--includes"]) == 1
+    assert "parts/frag.txt:3:1" in capsys.readouterr().err
+
+
+def test_prepare_reports_an_unresolved_include_once(tmp_path, capsys, monkeypatch):
+    _include_site(tmp_path)
+    monkeypatch.chdir(tmp_path)
+    assert main(["prepare", "--lint"]) == 0
+    err = capsys.readouterr().err
+    assert err.count("include-unresolved") == 1, err
+    assert "parts/frag.txt:3:1: unattached-block-attribute" in err
+
+
+def test_strict_build_counts_an_include_the_render_already_reported(
+    tmp_path, capsys, monkeypatch
+):
+    docs = tmp_path / "docs"
+    docs.mkdir()
+    (docs / "page.crv").write_text("{{ missing.txt }}\n", encoding="utf-8")
+    _write(tmp_path / "zensical.toml", "[tool.zensical-carve]\nincludes = true\n")
+    marker = _fake_zensical(tmp_path, monkeypatch)
+    monkeypatch.chdir(tmp_path)
+    assert main(["build", "--lint", "--", "--strict"]) == 1
+    err = capsys.readouterr().err
+    assert err.count("include-unresolved") == 1, err
+    assert not marker.exists()

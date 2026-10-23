@@ -95,11 +95,6 @@ def render(
         except Exception as error:
             raise CarveError(f"Carve refused the document: {error}") from error
 
-    if not hasattr(carve, "render_with_includes"):
-        raise CarveError(
-            "the installed carve-lang exposes no render_with_includes;"
-            " upgrade the engine, or turn includes off"
-        )
     try:
         result = carve.render_with_includes(
             source, include_root, source_path=source_path, **options
@@ -111,22 +106,31 @@ def render(
     return result["output"]
 
 
-def lint(source: str, *, extensions: Sequence[str] | None = None) -> list[dict[str, Any]]:
+def lint(
+    source: str,
+    *,
+    extensions: Sequence[str] | None = None,
+    include_root: str | None = None,
+    source_path: str | None = None,
+) -> list[dict[str, Any]]:
     """The engine's lint findings for one Carve document.
 
     Each finding is a dict with ``line``, ``column``, ``rule`` and ``message``.
-
-    Raises:
-        CarveError: if the installed engine has no linter.
+    With ``include_root`` and ``source_path`` the pass also lints every
+    included file; such a finding carries the root-relative ``file`` and the
+    ``includedBy`` chain of include sites.
     """
     try:
         import carve
     except ImportError as error:  # pragma: no cover - exercised by hand
         raise CarveError("the carve-lang package is required to lint Carve") from error
-    if not hasattr(carve, "lint"):
-        raise CarveError("the installed carve-lang exposes no lint; upgrade the engine")
+    options: dict[str, Any] = {}
+    if include_root is not None and source_path is not None:
+        options = {"include_root": include_root, "source_path": source_path}
     try:
-        return carve.lint(source, extensions=list(extensions) if extensions else None)
+        return carve.lint(
+            source, extensions=list(extensions) if extensions else None, **options
+        )
     except Exception as error:
         raise CarveError(f"Carve refused the document: {error}") from error
 

@@ -82,6 +82,8 @@ class Outcome:
     failed: list[tuple[Path, str]] = field(default_factory=list)
     findings: list[str] = field(default_factory=list)
     """Lint findings, one ``path:line:column: rule: message`` line each."""
+    unprinted: int = 0
+    """Include findings left unprinted because the render already warned."""
 
     def __bool__(self) -> bool:  # pragma: no cover - convenience only
         return bool(self.written)
@@ -237,7 +239,14 @@ def convert_tree(
         try:
             source = source_path.read_text(encoding="utf-8")
             if lint_pages:
-                outcome.findings.extend(_findings(source_path, source, extensions))
+                # The render below already warns about an include it could
+                # not expand, so the linter's line for it is not printed. It
+                # still counts for strict mode.
+                shown, skipped = _findings(
+                    source_path, source, extensions, include_root, include_rules=False
+                )
+                outcome.findings.extend(shown)
+                outcome.unprinted += skipped
             text = convert(
                 source,
                 extensions=extensions,
@@ -272,22 +281,58 @@ def convert_tree(
     return outcome
 
 
-def _findings(path: Path, source: str, extensions: Sequence[str] | None) -> list[str]:
-    return [
-        f"{path}:{item['line']}:{item['column']}: {item['rule']}: {item['message']}"
-        for item in lint(source, extensions=extensions)
-    ]
+def _findings(
+    path: Path,
+    source: str,
+    extensions: Sequence[str] | None,
+    include_root: str | None = None,
+    *,
+    include_rules: bool = True,
+) -> tuple[list[str], int]:
+    """One line per finding, and how many include findings were left out.
+
+    A finding in an included file names that file.
+    """
+    identity = _identity(path, include_root)
+    lines = []
+    skipped = 0
+    for item in lint(
+        source, extensions=extensions, include_root=include_root, source_path=identity
+    ):
+        if not include_rules and item["rule"].startswith("include-"):
+            skipped += 1
+            continue
+        finding = f"{item['line']}:{item['column']}: {item['rule']}: {item['message']}"
+        origin = item.get("file")
+        if origin and origin != identity:
+            sites = ", ".join(
+                f"{site['file']}:{site['line']}:{site['column']}"
+                for site in item.get("includedBy") or []
+            )
+            lines.append(f"{path}: {origin}:{finding} (included at {sites})")
+        else:
+            lines.append(f"{path}:{finding}")
+    return lines, skipped
 
 
 def lint_tree(
-    docs_dir: Path, *, extensions: Sequence[str] | None = None
+    docs_dir: Path,
+    *,
+    extensions: Sequence[str] | None = None,
+    include_root: str | None = None,
 ) -> Outcome:
-    """Lint every ``.crv`` under ``docs_dir`` without writing anything."""
+    """Lint every ``.crv`` under ``docs_dir`` without writing anything.
+
+    With ``include_root`` the linter follows includes, and an include that
+    cannot be expanded is a finding of its own.
+    """
     outcome = Outcome()
     for source_path in _sources(docs_dir):
         try:
             source = source_path.read_text(encoding="utf-8")
-            outcome.findings.extend(_findings(source_path, source, extensions))
+            outcome.findings.extend(
+                _findings(source_path, source, extensions, include_root)[0]
+            )
         except (CarveError, OSError) as error:
             outcome.failed.append((source_path, str(error)))
         except UnicodeDecodeError as error:
@@ -441,6 +486,17 @@ def main(argv: Sequence[str] | None = None) -> int:
         metavar="NAME",
         help="enable a Carve extension; repeat for several",
     )
+    lint_parser.add_argument(
+        "--includes",
+        action="store_true",
+        help="follow `{{ path }}` includes and lint the included files too",
+    )
+    lint_parser.add_argument(
+        "--include-root",
+        default=None,
+        metavar="DIR",
+        help="an absolute containment root for includes (default: the docs directory)",
+    )
 
     build = sub.add_parser("build", help="prepare, then run `zensical build`")
     _add_common(build)
@@ -474,7 +530,11 @@ def main(argv: Sequence[str] | None = None) -> int:
         print(f"zensical-carve: settings from {settings.source}")
 
     if args.command == "lint":
-        checked = lint_tree(docs_dir, extensions=settings.extensions)
+        checked = lint_tree(
+            docs_dir,
+            extensions=settings.extensions,
+            include_root=config.containment_root(settings),
+        )
         for line in checked.findings:
             print(f"zensical-carve: {line}", file=sys.stderr)
         for path, message in checked.failed:
@@ -535,9 +595,10 @@ def main(argv: Sequence[str] | None = None) -> int:
     rest = [item for item in args.rest if item != "--"]
     # Zensical's strict mode cannot see these warnings, because they are
     # printed before it starts, so honor its flag here.
-    if outcome.findings and ("--strict" in rest or "-s" in rest):
+    found = len(outcome.findings) + outcome.unprinted
+    if found and ("--strict" in rest or "-s" in rest):
         print(
-            f"zensical-carve: aborted with {len(outcome.findings)} lint warnings"
+            f"zensical-carve: aborted with {found} lint warnings"
             " in strict mode",
             file=sys.stderr,
         )
