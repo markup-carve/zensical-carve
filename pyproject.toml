@@ -27,8 +27,8 @@ dependencies = [
   # The Carve engine (the PyO3 binding over carve-rs).
   #
   # The floor is a claim about the oldest engine this package works with, not a
-  # formality. It is 0.1.10 because that is the first release whose `lint`
-  # takes an include root, which `lint` with includes relies on. (0.1.0 was
+  # formality. It is 0.1.11 because region includes and the include-non-text
+  # warning first ship there. (0.1.0 was
   # also unsafe: it rendered `srcset="safe.png 1x, javascript:alert(1) 2x"`
   # unsanitized, see tests/test_engine_floor.py.) The floor moves when an older
   # engine stops working, not because a newer one exists.
@@ -43,7 +43,7 @@ dependencies = [
   #
   # A range is the right shape for a consumer and the wrong one for a test run,
   # so CI installs under `constraints-ci.txt` instead. See that file.
-  "carve-lang>=0.1.10,<0.2.0",
+  "carve-lang>=0.1.11,<0.2.0",
   "pygments-carve>=0.1.3,<0.2.0",
   "pymdown-extensions>=10.0",
   "tomli>=2.0; python_version < '3.11'",
