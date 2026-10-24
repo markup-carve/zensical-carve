@@ -285,6 +285,18 @@ wheels = [
 ]
 
 [[package]]
+name = "pygments-carve"
+version = "0.1.3"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "pygments" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/0d/c1/fcfb07959410bde5f3f1a7a27566b7a8f7c83c9760dc40cb24d35732672b/pygments_carve-0.1.3.tar.gz", hash = "sha256:0969058977ffca7bae373bbbd8090baf91a842768be610b9835de33496cc0a95", size = 103601, upload-time = "2026-10-24T20:48:02.463Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/80/28/eeeabebae7662e946821f1956925097a6c0352697c1b22f2746b9af1923c/pygments_carve-0.1.3-py3-none-any.whl", hash = "sha256:1c2a0722a4ec72b417eca33545803439c3d27f216f93ab75c735735c2ea494b3", size = 34782, upload-time = "2026-10-24T20:48:01.268Z" },
+]
+
+[[package]]
 name = "pymdown-extensions"
 version = "12.3"
 source = { registry = "https://pypi.org/simple" }
@@ -529,6 +541,8 @@ version = "0.1.4"
 source = { editable = "." }
 dependencies = [
     { name = "carve-lang" },
+    { name = "pygments-carve" },
+    { name = "pymdown-extensions" },
     { name = "tomli", marker = "python_full_version < '3.11'" },
 ]
 
@@ -546,6 +560,8 @@ zensical = [
 [package.metadata]
 requires-dist = [
     { name = "carve-lang", specifier = ">=0.1.10,<0.2.0" },
+    { name = "pygments-carve", specifier = ">=0.1.3,<0.2.0" },
+    { name = "pymdown-extensions", specifier = ">=10.0" },
     { name = "pytest", marker = "extra == 'dev'", specifier = ">=8.0" },
     { name = "tomli", marker = "python_full_version < '3.11'", specifier = ">=2.0" },
     { name = "zensical", marker = "extra == 'dev'", specifier = ">=0.0.56" },
