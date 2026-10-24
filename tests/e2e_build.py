@@ -27,6 +27,7 @@ INDEX = """\
 
 A *bold* and /italic/ line, {=highlighted=} text, and a :smile: symbol.
 
+
 ::: details "Only with the extension"
 Which the fence can only know from the configuration table.
 :::
@@ -47,6 +48,16 @@ A :smile: here too.
 | Engine | Language |
 |--------|----------|
 | carve-rs | Rust |
+
+```csv
+name,value
+a,b
+```
+
+```tsv
+name\tvalue
+a\tb
+```
 """
 
 
@@ -104,6 +115,9 @@ def main() -> int:
             _fail("the fence ignored the emoji setting in [tool.zensical-carve]")
 
         whole = (site / "site" / "whole" / "index.html").read_text(encoding="utf-8")
+        tsv = whole[whole.find('language-tsv'):]
+        if 'class="ow">,</span>' not in whole or not re.search(r'class="ow">[ \t]+</span>', tsv):
+            _fail("CSV and TSV separators did not reach the theme highlighter")
         if "Whole page mode" not in whole:
             _fail("the whole page did not render")
         # The four things a raw-HTML body loses, each measured on a real build

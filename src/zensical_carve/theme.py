@@ -80,6 +80,14 @@ def _markdown_code(pre_attrs: dict[str, str], code_attrs: dict[str, str], body: 
         options.append(f'title="{title}"')
 
     source = html.unescape(body)
+    if language == "tsv":
+        # Python-Markdown expands tabs before its fence highlighter sees them.
+        # Highlight the original body with the same Pymdownx highlighter here.
+        from pymdownx.highlight import Highlight
+
+        return "\n\n" + Highlight(None, pygments_lang_class=True).highlight(
+            source, language, title=pre_attrs.get("title")
+        ) + "\n\n"
     # A fence must be longer than any backtick run inside the payload.
     longest = max((len(run) for run in re.findall(r"`+", source)), default=0)
     fence = "`" * max(3, longest + 1)
