@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.5] - 2026-10-24
+
+CSV and TSV fences now receive distinct field and separator highlighting in Zensical sites.
+
+### Improvements
+
+- CSV and TSV fence separators receive their own highlight color, and TSV tabs survive Markdown processing (#36).
+
+**Full Changelog**: https://github.com/markup-carve/zensical-carve/compare/0.1.4...0.1.5
+
 ## [0.1.4] - 2026-10-23
 
 ### Improvements
