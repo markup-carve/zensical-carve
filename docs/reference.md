@@ -230,6 +230,21 @@ missing or refused by containment: both report `include-unresolved`, so a page
 cannot be used to probe the filesystem. The class is printed on its own line for
 the build's log.
 
+With `includes = true`, a whole Carve page can select a named region:
+
+```text
+{{ src/example.py @region:demo @code:python }}
+{{ parts/intro.crv @region:summary }}
+```
+
+Use whole-line `#region demo` and `#endregion` markers in the Python file,
+and `%% #region summary` and `%% #endregion` in the Carve file. The markers
+and text outside the region do not render. A missing or malformed region
+prints `include-region-invalid`; invalid UTF-8 in an included file prints
+`include-non-text` in the build log. The `include-root` setting above also
+applies to region includes. Zensical Carve renders HTML and does not write
+Carve source, so `align_tables` does not apply.
+
 **A fence does not expand, and says so.** A ` ```carve ` block has no file of its
 own for a relative path to resolve against. The block keeps its directive
 literal, and the build prints one line saying it did, so the two paths cannot
