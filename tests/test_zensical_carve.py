@@ -211,6 +211,17 @@ def test_task_items_get_the_classes_the_theme_styles():
     assert 'class="task-list-item"' in out
 
 
+def test_task_states_keep_their_attributes_and_theme_classes():
+    from carve import to_html
+
+    for marker, state in (("_", "_"), ("/", "/"), ("!", "!")):
+        out = adapt(to_html(f"- [{marker}] task"))
+        assert 'class="task-list"' in out
+        assert 'class="task-list-item"' in out
+        assert f'data-task-state="{state}"' in out
+        assert '<input type="checkbox"' in out
+
+
 def test_everything_else_survives_untouched():
     source = (
         '<aside class="admonition note"><p class="admonition-title">T</p></aside>\n'
