@@ -41,7 +41,7 @@ _CODE = re.compile(
     re.DOTALL,
 )
 _ATTR = re.compile(r"""(?P<name>[-\w]+)\s*=\s*"(?P<value>[^"]*)\"""")
-_TASK_ITEM = re.compile(r"<li>(\s*)<input type=\"checkbox\"")
+_TASK_ITEM = re.compile(r'<li(?P<attrs>[^>]*)>(?P<space>\s*)<input type="checkbox"')
 _INJECTED_MARKUP = re.compile(r"<[a-zA-Z/]")
 
 
@@ -221,7 +221,15 @@ def adapt(carve_html: str) -> str:
     # The theme styles a task list by class; without them the bullet marker
     # shows next to the checkbox.
     if _TASK_ITEM.search(out):
-        out = _TASK_ITEM.sub(r'<li class="task-list-item">\1<input type="checkbox"', out)
+        def style_task_item(match: re.Match[str]) -> str:
+            attrs = match.group("attrs")
+            if 'class="' in attrs:
+                attrs = attrs.replace('class="', 'class="task-list-item ', 1)
+            else:
+                attrs = f' class="task-list-item"{attrs}'
+            return f'<li{attrs}>{match.group("space")}<input type="checkbox"'
+
+        out = _TASK_ITEM.sub(style_task_item, out)
         out = re.sub(
             r"<ul>(\s*<li class=\"task-list-item\")", r'<ul class="task-list">\1', out
         )
