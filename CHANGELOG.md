@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.6] - 2026-10-26
+
+Zensical sites now style the new Carve task states as task lists.
+
+### Fixes
+
+- Progress, blocked, and open alias tasks retain the theme's checkbox layout (#42).
+
+**Full Changelog**: https://github.com/markup-carve/zensical-carve/compare/0.1.5...0.1.6
+
 ## [0.1.5] - 2026-10-24
 
 CSV and TSV fences now receive distinct field and separator highlighting in Zensical sites.
