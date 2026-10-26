@@ -5,9 +5,6 @@
 Use [Carve][carve] in a [Zensical][zensical] site, either as a block inside a
 Markdown page or as a complete `.crv` page.
 
-```bash
-pip install zensical-carve
-```
 
 ## Carve blocks in Markdown
 
@@ -37,10 +34,6 @@ A *bold* and /italic/ line.
 Zensical does not discover `.crv` files as pages, so render them before the
 site build:
 
-```bash
-zensical-carve prepare
-zensical build
-```
 
 After configuration changes, use the combined command so it passes `--clean`
 and avoids stale generated pages:
