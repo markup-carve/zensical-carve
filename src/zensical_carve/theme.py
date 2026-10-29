@@ -43,10 +43,22 @@ _CODE = re.compile(
 _ATTR = re.compile(r"""(?P<name>[-\w]+)\s*=\s*"(?P<value>[^"]*)\"""")
 _TASK_ITEM = re.compile(r'<li(?P<attrs>[^>]*)>(?P<space>\s*)<input type="checkbox"')
 _INJECTED_MARKUP = re.compile(r"<[a-zA-Z/]")
+_FIGURE_OPEN = re.compile(r"<figure(?P<attrs>[^>]*)>\s*")
 
 
 def _attrs(raw: str) -> dict[str, str]:
     return {m.group("name"): m.group("value") for m in _ATTR.finditer(raw)}
+
+
+def _is_diff(text: str, pre_attrs: dict[str, str], pre_start: int) -> bool:
+    """A `{.diff}` class on the `<pre>`, or on the `<figure>` a caption wraps it in."""
+    if "diff" in pre_attrs.get("class", "").split():
+        return True
+    figure_start = text.rfind("<figure", 0, pre_start)
+    if figure_start < 0:
+        return False
+    figure = _FIGURE_OPEN.fullmatch(text, figure_start, pre_start)
+    return bool(figure) and "diff" in _attrs(figure.group("attrs")).get("class", "").split()
 
 
 def _heading_id(section_ids: list[str], attrs: dict[str, str]) -> str:
@@ -209,9 +221,10 @@ def adapt(carve_html: str) -> str:
                 # block stays HTML and forfeits the theme's highlighting, which
                 # is the cheaper of the two losses.
                 pieces.append(match.group(0))
-            elif "diff" in pre_attrs.get("class", "").split():
+            elif _is_diff(out, pre_attrs, match.start()):
                 # A `{.diff}` fence carries per-line +/-/space markers a Markdown
-                # fence cannot express; present it as HTML instead.
+                # fence cannot express; present it as HTML instead. With a caption
+                # the class sits on the enclosing figure (markup-carve/carve#2370).
                 pieces.append(_html_diff(pre_attrs, code_attrs, body))
             else:
                 pieces.append(_markdown_code(pre_attrs, code_attrs, body))

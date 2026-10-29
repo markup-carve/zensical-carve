@@ -283,6 +283,39 @@ def test_a_class_that_only_contains_diff_as_a_substring_still_fences():
     assert "```js" in out
 
 
+def test_a_captioned_diff_fence_takes_the_class_from_its_figure():
+    import carve
+
+    source = "{#lst-a .diff}\n```php\n-a\n+b\n```\n^ Listing #: x\n"
+    out = adapt(carve.to_html(source))
+    assert '<figure id="lst-a" class="diff">' in out
+    assert '<pre class="has-diff">' in out
+    assert 'class="line diff remove"><span class="diff-marker">-</span>a' in out
+    assert 'class="line diff add"><span class="diff-marker">+</span>b' in out
+    assert "<figcaption>Listing 1: x</figcaption>" in out
+    assert "```php" not in out
+
+
+@pytest.mark.parametrize(
+    "figure",
+    [
+        '<figure class="diffs">',
+        '<figure class="side-diff">',
+        '<figure class="diff"><p>x</p>',
+    ],
+)
+def test_a_figure_without_a_whole_diff_class_directly_around_the_pre_still_fences(figure):
+    out = adapt(f'{figure}\n  <pre><code class="language-js">- old();\n</code></pre>\n</figure>')
+    assert "has-diff" not in out
+    assert "```js" in out
+
+
+def test_a_side_diff_pre_still_fences():
+    out = adapt('<pre class="side-diff"><code class="language-js">- old();\n</code></pre>')
+    assert "has-diff" not in out
+    assert "```js" in out
+
+
 def test_an_ordinary_code_block_with_escaped_angle_brackets_still_fences():
     """`a &lt; b` is source, not markup, and must keep the theme's highlighting."""
     out = adapt('<pre><code class="language-c">if (a &lt; b) {}</code></pre>')
