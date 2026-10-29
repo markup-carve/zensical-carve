@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixes
+
+- A captioned `{.diff}` fence renders as a diff: the class on its enclosing `<figure>` now counts (markup-carve/carve#2370).
+
 ## [0.1.6] - 2026-10-26
 
 Zensical sites now style the new Carve task states as task lists.
