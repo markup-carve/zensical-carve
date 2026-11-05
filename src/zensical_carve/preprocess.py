@@ -89,15 +89,40 @@ class Outcome:
         return bool(self.written)
 
 
-_FRONT_MATTER = re.compile(r"\A---[ \t]*\r?\n(.*?)\r?\n(?:---|\.\.\.)[ \t]*\r?\n", re.DOTALL)
+# The engine's frontmatter shape (spec PART 2 `frontmatter`): an optional
+# format token after at most one space, and a bare `---` closer at column 0.
+_FRONT_MATTER = re.compile(
+    r"\A---(?: ?(?P<format>[A-Za-z0-9]+))?[ \t]*\r?\n"
+    r"(?P<body>.*?)^---[ \t]*(?:\r?\n|\Z)",
+    re.DOTALL | re.MULTILINE,
+)
 
 
-def _split_front_matter(source: str) -> tuple[str, str]:
-    """Return ``(front_matter_body, rest)``, with an empty string for neither."""
+def _split_front_matter(source: str) -> tuple[str, str, str]:
+    """Return ``(front_matter_body, format, rest)``.
+
+    ``format`` is the opener's token, ``""`` for a bare ``---``; body and
+    format are empty when the source has no front matter.
+    """
     match = _FRONT_MATTER.match(source)
     if not match:
-        return "", source
-    return match.group(1), source[match.end() :]
+        return "", "", source
+    body = match.group("body").rstrip("\r\n")
+    return body, match.group("format") or "", source[match.end() :]
+
+
+def _zensical_front_matter(source: str, source_path: Path | None) -> str:
+    """The front matter Zensical can read: YAML, which a bare ``---`` means."""
+    body, format_token, _ = _split_front_matter(source)
+    if format_token.lower() in ("", "yaml"):
+        return body
+    where = f"{source_path}: " if source_path is not None else ""
+    print(
+        f"zensical-carve: {where}front matter in format '{format_token}' is not"
+        " passed to Zensical, which reads YAML only",
+        file=sys.stderr,
+    )
+    return ""
 
 
 def convert(
@@ -119,7 +144,7 @@ def convert(
     ``theme=False`` for the raw HTML, which is higher fidelity and less
     integrated.
     """
-    front_matter, _ = _split_front_matter(source)
+    front_matter = _zensical_front_matter(source, source_path)
     html = render(
         source,
         extensions=extensions,
@@ -194,7 +219,7 @@ def _is_generated(path: Path) -> bool:
             head = handle.read(4096)
     except OSError:
         return False
-    front_matter, _ = _split_front_matter(head)
+    front_matter, _, _ = _split_front_matter(head)
     return GENERATED_MARKER in front_matter
 
 
