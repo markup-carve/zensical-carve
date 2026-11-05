@@ -61,3 +61,8 @@ def test_empty_front_matter_is_dropped():
     page = convert("---\n---\nbody\n")
     assert _meta(page) == {"zensical_carve": "generated"}
     assert "<p>body</p>" in page
+
+
+def test_a_keep_chomping_scalar_keeps_its_blank_lines():
+    page = convert("---\ndescription: |+\n  hello\n\n\n---\nbody\n")
+    assert _meta(page)["description"] == "hello\n\n\n"

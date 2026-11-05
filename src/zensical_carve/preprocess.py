@@ -107,7 +107,9 @@ def _split_front_matter(source: str) -> tuple[str, str, str]:
     match = _FRONT_MATTER.match(source)
     if not match:
         return "", "", source
-    body = match.group("body").rstrip("\r\n")
+    body = match.group("body")
+    # Only the closer's own line break: a `|+` scalar keeps blank lines.
+    body = body[:-2] if body.endswith("\r\n") else body.removesuffix("\n")
     return body, match.group("format") or "", source[match.end() :]
 
 
