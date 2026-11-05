@@ -104,7 +104,9 @@ title: A whole Carve page
 ```
 
 becomes a page whose `title` Zensical reads, exactly as if you had written the
-front matter in Markdown.
+front matter in Markdown. The opener may name its format (`--- yaml`), and the
+closer is a bare `---`. Zensical reads YAML only, so front matter in another
+format (`--- toml`) is left out of the page with a warning.
 
 ### Configuration
 
