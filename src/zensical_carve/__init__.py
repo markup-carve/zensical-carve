@@ -112,13 +112,15 @@ def lint(
     extensions: Sequence[str] | None = None,
     include_root: str | None = None,
     source_path: str | None = None,
+    caption_hints: bool = False,
 ) -> list[dict[str, Any]]:
     """The engine's lint findings for one Carve document.
 
     Each finding is a dict with ``line``, ``column``, ``rule`` and ``message``.
     With ``include_root`` and ``source_path`` the pass also lints every
     included file; such a finding carries the root-relative ``file`` and the
-    ``includedBy`` chain of include sites.
+    ``includedBy`` chain of include sites. ``caption_hints`` adds the opt-in
+    ``caption-looking-paragraph`` hint.
     """
     try:
         import carve
@@ -127,6 +129,8 @@ def lint(
     options: dict[str, Any] = {}
     if include_root is not None and source_path is not None:
         options = {"include_root": include_root, "source_path": source_path}
+    if caption_hints:
+        options["caption_hints"] = True
     try:
         return carve.lint(
             source, extensions=list(extensions) if extensions else None, **options

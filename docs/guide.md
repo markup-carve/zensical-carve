@@ -82,7 +82,10 @@ with no definition) on every `.crv` page, and exits 1 when it finds any. With
 `lint = true` or `--lint`, `prepare` and `build` print the same findings as
 warnings, and `zensical-carve build -- --strict` stops before Zensical runs.
 With includes on, the linter also checks every included Carve file and names
-the include site of each finding there.
+the include site of each finding there. Non-canonical spellings such as a `---`
+thematic break or a glued `|=>` cell alignment are findings too; see the
+[reference](reference.md) for the rule ids, `caption-hints` and the
+suppression comment.
 
 ## Includes and build output
 
