@@ -96,6 +96,7 @@ _FRONT_MATTER = re.compile(
     r"(?P<body>.*?)^---[ \t]*(?:\r?\n|\Z)",
     re.DOTALL | re.MULTILINE,
 )
+_FRONT_MATTER_OPENER = re.compile(r"\A---(?: ?[A-Za-z0-9]+)?[ \t]*(?:\r?\n|\Z)")
 
 
 def _split_front_matter(source: str) -> tuple[str, str, str]:
@@ -115,10 +116,20 @@ def _split_front_matter(source: str) -> tuple[str, str, str]:
 
 def _zensical_front_matter(source: str, source_path: Path | None) -> str:
     """The front matter Zensical can read: YAML, which a bare ``---`` means."""
+    where = f"{source_path}: " if source_path is not None else ""
+    if not _FRONT_MATTER.match(source):
+        if _FRONT_MATTER_OPENER.match(source):
+            # markup-carve/carve#5016: an opener without a closer runs to the end.
+            print(
+                f"zensical-carve: {where}the first line opens front matter and no"
+                " `---` closes it, so the whole page is front matter; close it,"
+                " or write a thematic break as `***`",
+                file=sys.stderr,
+            )
+        return ""
     body, format_token, _ = _split_front_matter(source)
     if format_token.lower() in ("", "yaml"):
         return body
-    where = f"{source_path}: " if source_path is not None else ""
     print(
         f"zensical-carve: {where}front matter in format '{format_token}' is not"
         " passed to Zensical, which reads YAML only",
@@ -240,6 +251,7 @@ def convert_tree(
     include_root: str | None = None,
     prerender: "prerender_module.Options | None" = None,
     lint_pages: bool = False,
+    caption_hints: bool = False,
 ) -> Outcome:
     """Render every ``.crv`` under ``docs_dir`` to a sibling ``.md``.
 
@@ -270,7 +282,12 @@ def convert_tree(
                 # not expand, so the linter's line for it is not printed. It
                 # still counts for strict mode.
                 shown, skipped = _findings(
-                    source_path, source, extensions, include_root, include_rules=False
+                    source_path,
+                    source,
+                    extensions,
+                    include_root,
+                    include_rules=False,
+                    caption_hints=caption_hints,
                 )
                 outcome.findings.extend(shown)
                 outcome.unprinted += skipped
@@ -315,6 +332,7 @@ def _findings(
     include_root: str | None = None,
     *,
     include_rules: bool = True,
+    caption_hints: bool = False,
 ) -> tuple[list[str], int]:
     """One line per finding, and how many include findings were left out.
 
@@ -324,7 +342,11 @@ def _findings(
     lines = []
     skipped = 0
     for item in lint(
-        source, extensions=extensions, include_root=include_root, source_path=identity
+        source,
+        extensions=extensions,
+        include_root=include_root,
+        source_path=identity,
+        caption_hints=caption_hints,
     ):
         if not include_rules and item["rule"].startswith("include-"):
             skipped += 1
@@ -347,6 +369,7 @@ def lint_tree(
     *,
     extensions: Sequence[str] | None = None,
     include_root: str | None = None,
+    caption_hints: bool = False,
 ) -> Outcome:
     """Lint every ``.crv`` under ``docs_dir`` without writing anything.
 
@@ -358,7 +381,13 @@ def lint_tree(
         try:
             source = source_path.read_text(encoding="utf-8")
             outcome.findings.extend(
-                _findings(source_path, source, extensions, include_root)[0]
+                _findings(
+                    source_path,
+                    source,
+                    extensions,
+                    include_root,
+                    caption_hints=caption_hints,
+                )[0]
             )
         except (CarveError, OSError) as error:
             outcome.failed.append((source_path, str(error)))
@@ -446,6 +475,7 @@ def _add_render_options(parser: argparse.ArgumentParser) -> None:
         action="store_true",
         help="report lint findings on every .crv page as warnings",
     )
+    _add_caption_hints(parser)
     parser.add_argument(
         "--force",
         action="store_true",
@@ -456,6 +486,14 @@ def _add_render_options(parser: argparse.ArgumentParser) -> None:
         action="store_true",
         help="emit Carve's HTML verbatim, without handing headings and code"
         " blocks back to the theme",
+    )
+
+
+def _add_caption_hints(parser: argparse.ArgumentParser) -> None:
+    parser.add_argument(
+        "--caption-hints",
+        action="store_true",
+        help="also report a paragraph beside an image or table that reads like a caption",
     )
 
 
@@ -476,6 +514,7 @@ def _resolve(args: argparse.Namespace) -> Settings:
         docs_dir=args.docs_dir,
         extensions=tuple(args.extensions) if args.extensions else None,
         lint=getattr(args, "lint", False),
+        caption_hints=getattr(args, "caption_hints", False),
         emoji=getattr(args, "emoji", None),
         includes=getattr(args, "includes", False),
         include_root=getattr(args, "include_root", None),
@@ -524,6 +563,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         metavar="DIR",
         help="an absolute containment root for includes (default: the docs directory)",
     )
+    _add_caption_hints(lint_parser)
 
     build = sub.add_parser("build", help="prepare, then run `zensical build`")
     _add_common(build)
@@ -561,6 +601,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             docs_dir,
             extensions=settings.extensions,
             include_root=config.containment_root(settings),
+            caption_hints=settings.caption_hints,
         )
         for line in checked.findings:
             print(f"zensical-carve: {line}", file=sys.stderr)
@@ -593,6 +634,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         extensions=settings.extensions,
         extension_options=settings.extension_options,
         lint_pages=settings.lint,
+        caption_hints=settings.caption_hints,
         force=settings.force,
         theme=not settings.raw_html,
         symbols=symbols,

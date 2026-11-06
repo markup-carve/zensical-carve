@@ -106,7 +106,9 @@ title: A whole Carve page
 becomes a page whose `title` Zensical reads, exactly as if you had written the
 front matter in Markdown. The opener may name its format (`--- yaml`), and the
 closer is a bare `---`. Zensical reads YAML only, so front matter in another
-format (`--- toml`) is left out of the page with a warning.
+format (`--- toml`) is left out of the page with a warning. A first line of
+`---` with no closer makes the whole page front matter, so the page renders
+empty and the build warns; write a thematic break as `***`.
 
 ### Configuration
 
@@ -130,6 +132,7 @@ that one run. `--config FILE` points at a file directly.
 | --- | --- |
 | `extensions` | list of Carve extension names; an entry `{ name = { option = value } }` also sets that extension's options |
 | `lint` | `true` to report lint findings on every page while preparing, default `false` |
+| `caption-hints` | `true` to add the opt-in `caption-looking-paragraph` hint, default `false` |
 | `emoji` | `none` (default), `unicode`, or `twemoji` |
 | `symbols` | inline table, or a path to a JSON object, mapping a name to what `:name:` renders as |
 | `docs-dir` | the directory to walk, default `docs` |
@@ -179,9 +182,10 @@ render alike.
 Options: `--docs-dir` (default `docs`), `--config FILE`, `--extension NAME`
 (repeatable, enables a Carve extension), `--emoji none|unicode|twemoji`,
 `--symbols FILE.json`, `--prerender LANGUAGE` (repeatable), `--prerender-url
-URL`, `--includes`, `--include-root DIR`, `--lint`, `--force`, `--raw-html`.
-Each has a key in the configuration table above. `lint` takes `--docs-dir`,
-`--config`, `--extension`, `--includes` and `--include-root`.
+URL`, `--includes`, `--include-root DIR`, `--lint`, `--caption-hints`,
+`--force`, `--raw-html`. Each has a key in the configuration table above.
+`lint` takes `--docs-dir`, `--config`, `--extension`, `--includes`,
+`--include-root` and `--caption-hints`.
 
 With `lint` on, `prepare` and `build` print each finding as
 `zensical-carve: WARNING: docs/page.crv:3:1: unattached-block-attribute: ...`
@@ -189,6 +193,21 @@ and carry on. Zensical's strict mode cannot see those lines, because they are
 printed before it starts, so `zensical-carve build -- --strict` (or `-s`)
 checks them itself and exits 1 before running `zensical build`. A ` ```carve `
 block inside a Markdown page is not linted.
+
+Every finding counts, hints included. Spellings that still render but are not
+canonical are findings too: a thematic break written other than `***`
+(`thematic-break-spelling`) and a glued cell alignment such as `|=>`
+(`deprecated-cell-alignment`, write `|={>}`). Rewrite them, or silence one
+line with a comment above it:
+
+```text
+%% carve-lint-disable-next-line thematic-break-spelling
+---
+```
+
+`caption-hints = true` (or `--caption-hints`) adds `caption-looking-paragraph`,
+which flags a paragraph beside an image or table that reads like a caption and
+should be a `^` caption line.
 
 With includes on, the linter follows them and checks every included Carve file
 too. A finding inside one names the page, the included file and the include
@@ -246,6 +265,17 @@ prints `include-region-invalid`; invalid UTF-8 in an included file prints
 `include-non-text` in the build log. The `include-root` setting above also
 applies to region includes. Zensical Carve renders HTML and does not write
 Carve source, so `align_tables` does not apply.
+
+A CSV or TSV include under a `{table}` line renders as a table, and can select
+records and columns:
+
+```text
+{table}
+{{ data/plans.csv @code:csv @rows:3-4 @cols:"Plan,Seats" }}
+```
+
+Record 1 is the header row, which the table keeps. `@cols` picks columns by
+header name, in the order given.
 
 **A fence does not expand, and says so.** A ` ```carve ` block has no file of its
 own for a relative path to resolve against. The block keeps its directive

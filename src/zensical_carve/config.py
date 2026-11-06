@@ -88,6 +88,8 @@ class Settings:
     extension_options: dict[str, dict[str, Any]] = field(default_factory=dict)
     """Options per extension name, from a ``{ name = { ... } }`` entry."""
     lint: bool = False
+    caption_hints: bool = False
+    """Add the opt-in ``caption-looking-paragraph`` lint hint."""
     raw_html: bool = False
     force: bool = False
     emoji: str = "none"
@@ -170,6 +172,7 @@ _READERS: dict[str, str] = {
     "docs-dir": "docs_dir",
     "extensions": "extensions",
     "lint": "lint",
+    "caption-hints": "caption_hints",
     "raw-html": "raw_html",
     "emoji": "emoji",
     "symbols": "symbols",
@@ -236,6 +239,11 @@ def _value(name: str, raw: Any, source: Path) -> Any:
     if name == "lint":
         if not isinstance(raw, bool):
             raise ConfigError(f"{source}: lint must be true or false")
+        return raw
+
+    if name == "caption_hints":
+        if not isinstance(raw, bool):
+            raise ConfigError(f"{source}: caption-hints must be true or false")
         return raw
 
     if name == "raw_html":
