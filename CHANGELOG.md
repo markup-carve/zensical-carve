@@ -7,9 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.7] - 2026-11-12
+
+Zensical sites move to carve-lang 0.1.13, gain the `caption-hints` option, and lift front matter the way the engine reads it.
+
+### Breaking
+
+- Requires carve-lang 0.1.13 or later, up from 0.1.11 (#48). With it, a `---` break reports `thematic-break-spelling` (write `***`) and a glued `|=>` reports `deprecated-cell-alignment` (write `|={>}`), so `build -- --strict` can start failing.
+
 ### Fixes
 
-- A captioned `{.diff}` fence renders as a diff: the class on its enclosing `<figure>` now counts (markup-carve/carve#2370).
+- A captioned `{.diff}` fence renders as a diff: the class on its enclosing `<figure>` now counts (#46).
+- Front matter with a format token (`--- yaml`) or a closer at end of file is lifted, and a `...` line no longer closes it, matching the engine (#47).
+
+### Improvements
+
+- New `caption-hints` config key and `--caption-hints` flag add the engine's `caption-looking-paragraph` lint hint (#48).
+- A first-line `---` that is never closed makes the whole page front matter; the build now warns that the page renders empty (#48).
+
+**Full Changelog**: https://github.com/markup-carve/zensical-carve/compare/0.1.6...0.1.7
 
 ## [0.1.6] - 2026-10-26
 
