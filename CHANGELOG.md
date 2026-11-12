@@ -7,13 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [0.1.7] - 2026-11-11
+## [0.1.7] - 2026-11-12
 
-Zensical sites move to carve-lang 0.1.14, gain the `caption-hints` option, and lift front matter the way the engine reads it.
+Zensical sites move to carve-lang 0.1.13, gain the `caption-hints` option, and lift front matter the way the engine reads it.
 
 ### Breaking
 
-- Requires carve-lang 0.1.14 or later, up from 0.1.11 (#48). With it, a `---` break reports `thematic-break-spelling` (write `***`) and a glued `|=>` reports `deprecated-cell-alignment` (write `|={>}`), so `build -- --strict` can start failing.
+- Requires carve-lang 0.1.13 or later, up from 0.1.11 (#48). With it, a `---` break reports `thematic-break-spelling` (write `***`) and a glued `|=>` reports `deprecated-cell-alignment` (write `|={>}`), so `build -- --strict` can start failing.
 
 ### Fixes
 

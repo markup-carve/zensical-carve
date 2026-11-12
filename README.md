@@ -1,6 +1,6 @@
 # zensical-carve
 
-Zensical integration for Carve blocks and `.crv` pages, using carve-lang 0.1.14 or later. It renders complete pages before the Zensical build. Read the [Carve documentation](https://markup-carve.github.io/carve/) for the language syntax.
+Zensical integration for Carve blocks and `.crv` pages, using carve-lang 0.1.13 or later. It renders complete pages before the Zensical build. Read the [Carve documentation](https://markup-carve.github.io/carve/) for the language syntax.
 
 ## Install
 
