@@ -148,6 +148,7 @@ def convert(
     source_path: Path | None = None,
     include_root: str | None = None,
     prerender: "prerender_module.Options | None" = None,
+    allow_raw_html: bool = False,
 ) -> str:
     """Render one Carve document into the text of a Markdown page.
 
@@ -166,6 +167,7 @@ def convert(
         include_root=include_root,
         source_path=_identity(source_path, include_root),
         warn=_include_warner(source_path),
+        allow_raw_html=allow_raw_html,
     )
     if prerender is not None:
         html = prerender_module.apply(
@@ -252,6 +254,7 @@ def convert_tree(
     prerender: "prerender_module.Options | None" = None,
     lint_pages: bool = False,
     caption_hints: bool = False,
+    allow_raw_html: bool = False,
 ) -> Outcome:
     """Render every ``.crv`` under ``docs_dir`` to a sibling ``.md``.
 
@@ -297,6 +300,7 @@ def convert_tree(
                 extension_options=extension_options,
                 theme=theme,
                 symbols=symbols,
+                allow_raw_html=allow_raw_html,
                 source_path=source_path,
                 include_root=include_root,
                 prerender=prerender,
@@ -354,11 +358,7 @@ def _findings(
         finding = f"{item['line']}:{item['column']}: {item['rule']}: {item['message']}"
         origin = item.get("file")
         if origin and origin != identity:
-            sites = ", ".join(
-                f"{site['file']}:{site['line']}:{site['column']}"
-                for site in item.get("includedBy") or []
-            )
-            lines.append(f"{path}: {origin}:{finding} (included at {sites})")
+            lines.append(f"{path}: {origin}:{finding}")
         else:
             lines.append(f"{path}:{finding}")
     return lines, skipped
@@ -487,6 +487,11 @@ def _add_render_options(parser: argparse.ArgumentParser) -> None:
         help="emit Carve's HTML verbatim, without handing headings and code"
         " blocks back to the theme",
     )
+    parser.add_argument(
+        "--allow-raw-html",
+        action="store_true",
+        help="emit =html blocks and spans verbatim; Carve 0.2 escapes them by default",
+    )
 
 
 def _add_caption_hints(parser: argparse.ArgumentParser) -> None:
@@ -520,6 +525,7 @@ def _resolve(args: argparse.Namespace) -> Settings:
         include_root=getattr(args, "include_root", None),
         force=getattr(args, "force", False),
         raw_html=getattr(args, "raw_html", False),
+        allow_raw_html=getattr(args, "allow_raw_html", False),
         prerender=tuple(args.prerender) if getattr(args, "prerender", None) else None,
         prerender_url=getattr(args, "prerender_url", None),
         **extra,
@@ -640,6 +646,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         symbols=symbols,
         include_root=include_root,
         prerender=prerender,
+        allow_raw_html=settings.allow_raw_html,
     )
 
     for path in outcome.written:

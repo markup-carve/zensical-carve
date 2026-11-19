@@ -85,9 +85,10 @@ def main() -> int:
         )
         # Settings both seams read. Zensical ignores a table it does not know,
         # which is what lets them live in its own configuration file.
+        # No `extensions`: the Carve 0.2 engine cannot register them yet
+        # (markup-carve/carve-rs#4329), so the table carries only the emoji.
         config += (
             "\n[tool.zensical-carve]\n"
-            'extensions = ["details"]\n'
             'emoji = "twemoji"\n'
         )
         config_path.write_text(config, encoding="utf-8")
@@ -109,8 +110,8 @@ def main() -> int:
             _fail("the fence did not render: Carve highlight is missing")
         if "<em>bold</em>" in index:
             _fail("Markdown claimed the block - `*` must be strong in Carve, not emphasis")
-        if "<details>" not in index:
-            _fail("the fence ignored the extensions in [tool.zensical-carve]")
+        if "<details>" in index:
+            _fail("the details extension rendered, but the Carve 0.2 engine cannot register it yet")
         if 'class="twemoji"' not in index:
             _fail("the fence ignored the emoji setting in [tool.zensical-carve]")
 

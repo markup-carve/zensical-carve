@@ -10,8 +10,9 @@ import pytest
 from zensical_carve import config, render
 from zensical_carve.preprocess import convert, main
 
+# The Carve 0.2 binding has no decision_trace; its `call` marks it as newer.
 pytestmark = pytest.mark.skipif(
-    not hasattr(carve, "decision_trace"),
+    not (hasattr(carve, "decision_trace") or hasattr(carve, "call")),
     reason="needs the carve-lang release that ships decision_trace",
 )
 
@@ -43,7 +44,9 @@ def test_a_closed_opener_is_not_reported(capsys):
 def test_caption_hints_reach_the_linter(tmp_path, monkeypatch, capsys):
     monkeypatch.chdir(tmp_path)
     _docs(tmp_path, CAPTIONED)
-    assert main(["lint"]) == 0
+    # caption-looking-paragraph is on by default in Carve 0.2 (UPGRADING.md,
+    # the `lint --caption-hints` row), so plain lint reports it too.
+    assert main(["lint"]) == 1
     assert main(["lint", "--caption-hints"]) == 1
     assert "caption-looking-paragraph" in capsys.readouterr().err
 

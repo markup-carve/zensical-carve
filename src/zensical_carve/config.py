@@ -91,6 +91,8 @@ class Settings:
     caption_hints: bool = False
     """Add the opt-in ``caption-looking-paragraph`` lint hint."""
     raw_html: bool = False
+    allow_raw_html: bool = False
+    """Emit `=html` blocks and spans verbatim; Carve 0.2 escapes them by default."""
     force: bool = False
     emoji: str = "none"
     symbols: dict[str, str] = field(default_factory=dict)
@@ -174,6 +176,7 @@ _READERS: dict[str, str] = {
     "lint": "lint",
     "caption-hints": "caption_hints",
     "raw-html": "raw_html",
+    "allow-raw-html": "allow_raw_html",
     "emoji": "emoji",
     "symbols": "symbols",
     "includes": "includes",
@@ -249,6 +252,11 @@ def _value(name: str, raw: Any, source: Path) -> Any:
     if name == "raw_html":
         if not isinstance(raw, bool):
             raise ConfigError(f"{source}: raw-html must be true or false")
+        return raw
+
+    if name == "allow_raw_html":
+        if not isinstance(raw, bool):
+            raise ConfigError(f"{source}: allow-raw-html must be true or false")
         return raw
 
     if name == "includes":
@@ -333,6 +341,7 @@ def encode(settings: Settings) -> str:
             else None,
             "extension_options": settings.extension_options,
             "lint": settings.lint,
+            "allow_raw_html": settings.allow_raw_html,
             "emoji": settings.emoji,
             "symbols": settings.symbols,
             "includes": settings.includes,
@@ -357,6 +366,7 @@ def _decode(raw: str) -> Settings:
         extensions=tuple(extensions) if extensions is not None else None,
         extension_options=dict(data.get("extension_options") or {}),
         lint=bool(data.get("lint")),
+        allow_raw_html=bool(data.get("allow_raw_html")),
         emoji=data.get("emoji", "none"),
         symbols=dict(data.get("symbols") or {}),
         includes=bool(data.get("includes")),
