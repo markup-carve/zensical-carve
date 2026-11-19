@@ -122,6 +122,11 @@ emoji = "twemoji"
 docs-dir = "docs"
 ```
 
+> The Carve 0.2 engine cannot register extensions yet
+> ([carve-rs#4329](https://github.com/markup-carve/carve-rs/issues/4329)), so on
+> this branch any `extensions` entry or `--extension` flag is refused until it
+> lands.
+
 `zensical.toml` is read first - Zensical ignores a table it does not know, so
 the Carve settings sit next to the rest of the site's configuration - and
 `pyproject.toml` is read when `zensical.toml` has no table. A flag beats the
@@ -132,11 +137,12 @@ that one run. `--config FILE` points at a file directly.
 | --- | --- |
 | `extensions` | list of Carve extension names; an entry `{ name = { option = value } }` also sets that extension's options |
 | `lint` | `true` to report lint findings on every page while preparing, default `false` |
-| `caption-hints` | `true` to add the opt-in `caption-looking-paragraph` hint, default `false` |
+| `caption-hints` | kept for 0.1 configurations; `caption-looking-paragraph` is on by default in Carve 0.2 |
 | `emoji` | `none` (default), `unicode`, or `twemoji` |
 | `symbols` | inline table, or a path to a JSON object, mapping a name to what `:name:` renders as |
 | `docs-dir` | the directory to walk, default `docs` |
 | `raw-html` | `true` to skip the theme adaptation |
+| `allow-raw-html` | `true` to emit `=html` blocks and spans verbatim; Carve 0.2 escapes them by default |
 | `prerender` | list of diagram languages to draw at build time |
 | `prerender-url` | a Kroki instance, default `https://kroki.io` |
 | `prerender-command` | per-language command line, for a local binary |
@@ -205,22 +211,24 @@ line with a comment above it:
 ---
 ```
 
-`caption-hints = true` (or `--caption-hints`) adds `caption-looking-paragraph`,
-which flags a paragraph beside an image or table that reads like a caption and
-should be a `^` caption line.
+`caption-looking-paragraph` flags a paragraph beside an image or table that
+reads like a caption and should be a `^` caption line. It is on by default in
+Carve 0.2, so `caption-hints` no longer changes anything.
 
 With includes on, the linter follows them and checks every included Carve file
-too. A finding inside one names the page, the included file and the include
-site:
+too. A finding inside one names the page and the included file. The Carve 0.2
+diagnostic carries no include chain, so the 0.1 "(included at ...)" suffix is
+gone:
 
 ```
-zensical-carve: WARNING: docs/page.crv: parts/frag.crv:3:1: unattached-block-attribute: ... (included at page.crv:3:1)
+zensical-carve: WARNING: docs/page.crv: parts/frag.crv:3:1: unattached-block-attribute: ...
 ```
 
 During `prepare` and `build` an include that cannot be expanded is reported
 once, by the include warning, and not again by the linter. `zensical-carve
-lint` renders nothing, so there it reports such an include (`include-unresolved`,
-`include-non-text`) as a finding and exits 1.
+lint` renders nothing, so there it reports such an include (`include-not-found`,
+`include-non-text`) as a finding and exits 1. Without includes, each directive is
+reported as `include-no-resolver`.
 
 A generated page carries `zensical_carve: generated` in its front matter. That
 marker is what `clean` deletes on, and what stops `prepare` from overwriting a
@@ -246,10 +254,10 @@ than resolved, because resolving it lands on whatever directory the build ran
 from, which is not a root anyone chose.
 
 A target that cannot be read is reported against the page that asked for it, and
-the directive is left as written. The message does not say whether the file was
-missing or refused by containment: both report `include-unresolved`, so a page
-cannot be used to probe the filesystem. The class is printed on its own line for
-the build's log.
+the directive is left as written. The code names the cause: `include-not-found`,
+`include-outside-root`, `include-cycle` and the other codes of Carve 0.2
+(C2-N-061). A directive inside a sentence is text in 0.2 and is never expanded
+(C2-N-002).
 
 With `includes = true`, a whole Carve page can select a named region:
 
@@ -310,7 +318,8 @@ Core Carve works out of the box: rendering goes through [`carve-lang`][carve-lan
 the PyO3 binding over the Rust engine, so a page here renders exactly as `carve`
 on the command line renders it.
 
-Carve's Tier-2 and Tier-3 extensions are **off unless you enable them**, which is
+Carve's Tier-2 and Tier-3 extensions are **off unless you enable them** (and on
+this branch cannot be enabled yet, see carve-rs#4329), which is
 the spec's own default and not a choice this plugin makes. Which ones you want is
 a project question, so nothing is turned on for you:
 

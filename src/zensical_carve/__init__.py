@@ -21,6 +21,7 @@ a non-``.md`` file into the output verbatim, so a ``.crv`` page has to become a
 from __future__ import annotations
 
 import functools
+import os
 import sys
 from typing import Any, Mapping, Sequence
 
@@ -42,8 +43,9 @@ def render(
     include_root: str | None = None,
     source_path: str | None = None,
     warn: "Any | None" = None,
+    allow_raw_html: bool = False,
 ) -> str:
-    """Render Carve source to HTML.
+    """Render Carve source to HTML through the Carve 0.2 engine.
 
     Args:
         source: Carve markup.
@@ -61,6 +63,8 @@ def render(
             directive stays literal.
         source_path: The document's identity relative to ``include_root``.
         warn: Called with one message per include the engine could not use.
+        allow_raw_html: Emit `=html` blocks and spans verbatim. Carve 0.2
+            escapes them by default.
 
     Returns:
         The rendered HTML.
@@ -76,34 +80,31 @@ def render(
             "install zensical-carve with its dependencies"
         ) from error
 
+    # extension_options only ever comes with names, which the engine refuses
+    # until it can register extensions (markup-carve/carve-rs#4329).
+    names = list(extensions) if extensions else None
     options: dict[str, Any] = {}
-    if extensions is not None:
-        options["extensions"] = list(extensions)
-        configured = {
-            name: dict(value)
-            for name, value in (extension_options or {}).items()
-            if name in extensions
-        }
-        if configured:
-            options["extension_options"] = configured
     if symbols:
         options["symbols"] = dict(symbols)
+    if allow_raw_html:
+        options["rawHtml"] = True
 
     if include_root is None or source_path is None:
         try:
-            return carve.to_html(source, **options)
+            return carve.to_html(source, options, extensions=names)
         except Exception as error:
             raise CarveError(f"Carve refused the document: {error}") from error
 
+    options["includes"] = {"root": include_root, "file": source_path}
     try:
-        result = carve.render_with_includes(
-            source, include_root, source_path=source_path, **options
-        )
+        if names:
+            carve.to_html("", extensions=names)
+        result = carve.render(source, options, diagnostics=True)
     except Exception as error:
         raise CarveError(f"Carve refused the document: {error}") from error
     if warn is not None:
         _report_includes(result, warn)
-    return result["output"]
+    return result["html"]
 
 
 def lint(
@@ -118,49 +119,60 @@ def lint(
 
     Each finding is a dict with ``line``, ``column``, ``rule`` and ``message``.
     With ``include_root`` and ``source_path`` the pass also lints every
-    included file; such a finding carries the root-relative ``file`` and the
-    ``includedBy`` chain of include sites. ``caption_hints`` adds the opt-in
-    ``caption-looking-paragraph`` hint.
+    included file; such a finding carries the root-relative ``file``. The 0.2
+    record has no include chain. ``caption_hints`` is kept for 0.1 callers:
+    ``caption-looking-paragraph`` is on by default in Carve 0.2.
     """
     try:
         import carve
     except ImportError as error:  # pragma: no cover - exercised by hand
         raise CarveError("the carve-lang package is required to lint Carve") from error
     options: dict[str, Any] = {}
-    if include_root is not None and source_path is not None:
-        options = {"include_root": include_root, "source_path": source_path}
-    if caption_hints:
-        options["caption_hints"] = True
+    included = include_root is not None and source_path is not None
+    if included:
+        options["includes"] = {"root": include_root, "file": source_path}
     try:
-        return carve.lint(
-            source, extensions=list(extensions) if extensions else None, **options
-        )
+        if extensions:
+            carve.to_html("", extensions=list(extensions))
+        diagnostics = carve.lint(source, options)["diagnostics"]
     except Exception as error:
         raise CarveError(f"Carve refused the document: {error}") from error
+    findings = []
+    for item in diagnostics:
+        origin = item.get("file")
+        text = source
+        if included and origin and origin != source_path:
+            with open(os.path.join(include_root, origin), encoding="utf-8") as handle:
+                text = handle.read()
+        line, column = _position(text, item.get("range", {}).get("startOffset", 0))
+        finding = {"line": line, "column": column, "rule": item["code"], "message": item["message"]}
+        if origin:
+            finding["file"] = origin
+        findings.append(finding)
+    return findings
+
+
+def _position(text: str, offset: int) -> tuple[int, int]:
+    """A 1-based line and character column for a UTF-8 byte offset in ``text``."""
+    before = text.encode("utf-8")[: max(offset, 0)].decode("utf-8", errors="ignore")
+    return before.count("\n") + 1, len(before) - (before.rfind("\n") + 1) + 1
 
 
 def _report_includes(result: Mapping[str, Any], warn: Any) -> None:
-    """Hand every degraded include to ``warn``, with its class where there is one.
+    """Hand every degraded include to ``warn``.
 
-    The engine reports a containment refusal and a missing file as the same
-    `include-unresolved` warning, so a page cannot probe the filesystem (spec
-    I7). Which one it was is on the dependency, and that is where this reads it
-    from - the sanitized warning is left as the engine wrote it.
+    Carve 0.2 reports one code per cause (C2-N-061), so the code already says
+    whether the file was missing or refused by containment.
     """
-    denials = {
-        dependency["id"]: dependency["denial"]
-        for dependency in result["dependencies"]
-        if dependency["denial"]
-    }
-    for warning in result["warnings"]:
+    for warning in result.get("diagnostics", []):
+        if not warning["code"].startswith("include-") or warning.get("channel") != "parse":
+            continue
         where = warning.get("file")
         location = f"{where}: " if where else ""
-        warn(f"{location}{warning['rule']}: {warning['message']}")
-    suppressed = result["suppressed_warnings"]
+        warn(f"{location}{warning['code']}: {warning['message']}")
+    suppressed = result.get("suppressedDiagnostics", 0)
     if suppressed:
         warn(f"{suppressed} further include warnings suppressed")
-    for identifier, denial in denials.items():
-        warn(f"include {identifier}: {denial}")
 
 
 def fence(
@@ -205,6 +217,7 @@ def fence(
         extensions=settings.extensions,
         extension_options=settings.extension_options,
         symbols=symbol_map,
+        allow_raw_html=settings.allow_raw_html,
     )
     if prerender_options is not None:
         from . import prerender

@@ -8,6 +8,9 @@ from pathlib import Path
 
 import pytest
 
+#: The Carve 0.2 engine cannot register extensions yet.
+EXT_GAP = "extension registration not available yet in the Carve 0.2 engine: markup-carve/carve-rs#4329"
+
 import zensical_carve
 from zensical_carve import config, fence, lint, render
 from zensical_carve.preprocess import convert_tree, lint_tree, main
@@ -153,6 +156,7 @@ def test_a_malformed_extensions_entry_is_refused(tmp_path, entry):
 
 
 def test_render_passes_options_to_the_engine():
+    pytest.skip(EXT_GAP)
     html = render(
         "[[Foo Bar]]\n",
         extensions=["wikilinks"],
@@ -163,6 +167,7 @@ def test_render_passes_options_to_the_engine():
 
 
 def test_render_drops_options_for_an_extension_not_enabled():
+    pytest.skip(EXT_GAP)
     html = render(
         "[[Foo Bar]]\n",
         extensions=["details"],
@@ -172,6 +177,7 @@ def test_render_drops_options_for_an_extension_not_enabled():
 
 
 def test_options_reach_a_whole_page(tmp_path, monkeypatch):
+    pytest.skip(EXT_GAP)
     docs = _site(
         tmp_path,
         'extensions = [{ wikilinks = { css_class = "wl" } }]\n',
@@ -183,6 +189,7 @@ def test_options_reach_a_whole_page(tmp_path, monkeypatch):
 
 
 def test_options_reach_a_carve_fence(tmp_path, monkeypatch):
+    pytest.skip(EXT_GAP)
     _site(tmp_path, 'extensions = [{ wikilinks = { css_class = "wl" } }]\n')
     monkeypatch.chdir(tmp_path)
     monkeypatch.delenv(config.SETTINGS_ENV, raising=False)
@@ -209,6 +216,7 @@ def test_options_and_lint_round_trip_through_the_environment(monkeypatch, tmp_pa
 
 
 def test_an_extension_flag_drops_the_configured_options(tmp_path, monkeypatch):
+    pytest.skip(EXT_GAP)
     docs = _site(
         tmp_path,
         'extensions = [{ wikilinks = { css_class = "wl" } }]\n',
@@ -241,18 +249,21 @@ def test_lint_follows_includes_and_names_the_include_site(tmp_path, capsys, monk
     monkeypatch.chdir(tmp_path)
     assert main(["lint"]) == 1
     err = capsys.readouterr().err
-    assert (
-        "page.crv: parts/frag.txt:3:1: unattached-block-attribute: " in err
-        and "(included at page.crv:3:1)" in err
-    ), err
-    assert "page.crv:5:1: include-unresolved" in err
+    # No "(included at ...)" suffix: the 0.2 record has no include chain. The
+    # unexpanded include is reported by its cause (C2-N-061).
+    assert "page.crv: parts/frag.txt:3:1: unattached-block-attribute: " in err, err
+    assert "page.crv:5:1: include-not-found" in err
 
 
 def test_lint_without_includes_does_not_open_included_files(tmp_path, capsys, monkeypatch):
     _include_site(tmp_path, includes=False)
     monkeypatch.chdir(tmp_path)
-    assert main(["lint"]) == 0
-    assert "frag.txt" not in capsys.readouterr().err
+    # C2-N-003: with no resolver each directive is an include-no-resolver
+    # finding, so lint exits 1; nothing inside the included file is reported.
+    assert main(["lint"]) == 1
+    err = capsys.readouterr().err
+    assert "include-no-resolver" in err
+    assert "frag.txt:" not in err
 
 
 def test_the_lint_includes_flag_turns_following_on(tmp_path, capsys, monkeypatch):
@@ -267,7 +278,7 @@ def test_prepare_reports_an_unresolved_include_once(tmp_path, capsys, monkeypatc
     monkeypatch.chdir(tmp_path)
     assert main(["prepare", "--lint"]) == 0
     err = capsys.readouterr().err
-    assert err.count("include-unresolved") == 1, err
+    assert err.count("include-not-found") == 1, err  # C2-N-061
     assert "parts/frag.txt:3:1: unattached-block-attribute" in err
 
 
@@ -282,5 +293,37 @@ def test_strict_build_counts_an_include_the_render_already_reported(
     monkeypatch.chdir(tmp_path)
     assert main(["build", "--lint", "--", "--strict"]) == 1
     err = capsys.readouterr().err
-    assert err.count("include-unresolved") == 1, err
+    assert err.count("include-not-found") == 1, err  # C2-N-061
     assert not marker.exists()
+
+
+# --- Carve 0.2 options -------------------------------------------------------
+
+
+RAW = "```=html\n<div class=\"x\">raw</div>\n```\n"
+
+
+def test_raw_html_is_escaped_by_default():
+    # U-076, C2-H-050: the Carve 0.2 default escapes raw HTML.
+    assert '<div class="x">raw</div>' not in render(RAW)
+
+
+def test_allow_raw_html_passes_it_through():
+    assert '<div class="x">raw</div>' in render(RAW, allow_raw_html=True)
+
+
+def test_allow_raw_html_is_read_from_the_table(tmp_path):
+    path = tmp_path / "zensical.toml"
+    path.write_text("[tool.zensical-carve]\nallow-raw-html = true\n", encoding="utf-8")
+    assert config.load(path).allow_raw_html is True
+
+
+def test_a_configured_extension_is_refused_until_the_engine_has_it():
+    with pytest.raises(zensical_carve.CarveError, match="not available yet"):
+        render("x", extensions=["details"])
+
+
+def test_lint_positions_count_characters_from_byte_offsets():
+    findings = [f for f in lint("äb\n\n{#a}\n") if f["rule"] == "unattached-block-attribute"]
+    assert [(f["line"], f["column"]) for f in findings] == [(3, 1)]
+    assert zensical_carve._position("äü {", len("äü ".encode("utf-8"))) == (1, 4)

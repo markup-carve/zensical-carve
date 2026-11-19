@@ -52,7 +52,13 @@ Frontmatter is copied to the generated page for Zensical to read.
 ## Configuration
 
 Settings may live in `[tool.zensical-carve]` inside `zensical.toml` or
-`pyproject.toml`:
+`pyproject.toml`.
+
+> The Carve 0.2 engine cannot register extensions yet
+> ([carve-rs#4329](https://github.com/markup-carve/carve-rs/issues/4329)), so on
+> this branch any `extensions` entry or `--extension` flag is refused until it
+> lands.
+
 
 ```toml
 [tool.zensical-carve]
@@ -71,7 +77,9 @@ lint = true
 ```
 
 Command-line flags override the file. Configuration also controls symbol maps,
-raw HTML, diagram prerendering, and the Kroki endpoint. The default public
+raw HTML, diagram prerendering, and the Kroki endpoint. Carve 0.2 escapes
+`=html` blocks and spans by default; `allow-raw-html = true` emits them
+verbatim, for sites whose own authors write every page. The default public
 Kroki service receives diagram source; use a private endpoint when needed.
 
 ## Lint
@@ -82,10 +90,10 @@ with no definition) on every `.crv` page, and exits 1 when it finds any. With
 `lint = true` or `--lint`, `prepare` and `build` print the same findings as
 warnings, and `zensical-carve build -- --strict` stops before Zensical runs.
 With includes on, the linter also checks every included Carve file and names
-the include site of each finding there. Non-canonical spellings such as a `---`
-thematic break or a glued `|=>` cell alignment are findings too; see the
-[reference](reference.md) for the rule ids, `caption-hints` and the
-suppression comment.
+the file of each finding there. Non-canonical spellings such as a `---`
+thematic break are findings too, and so is a caption-looking paragraph, which
+Carve 0.2 reports by default; see the [reference](reference.md) for the rule ids
+and the suppression comment.
 
 ## Includes and build output
 
