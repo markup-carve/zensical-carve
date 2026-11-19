@@ -54,10 +54,9 @@ Frontmatter is copied to the generated page for Zensical to read.
 Settings may live in `[tool.zensical-carve]` inside `zensical.toml` or
 `pyproject.toml`.
 
-> The Carve 0.2 engine cannot register extensions yet
-> ([carve-rs#4329](https://github.com/markup-carve/carve-rs/issues/4329)), so on
-> this branch any `extensions` entry or `--extension` flag is refused until it
-> lands.
+> The Carve 0.2 Python binding cannot register host callbacks or transforms yet
+> ([carve-py#130](https://github.com/markup-carve/carve-py/issues/130)), so on
+> this branch the old 0.1 extension names are refused until it lands.
 
 
 ```toml

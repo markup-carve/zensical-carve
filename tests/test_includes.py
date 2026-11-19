@@ -8,7 +8,7 @@ from pathlib import Path
 import pytest
 
 #: The Carve 0.2 engine cannot register extensions yet.
-EXT_GAP = "extension registration not available yet in the Carve 0.2 engine: markup-carve/carve-rs#4329"
+EXT_GAP = "0.1 extension behavior awaits markup-carve/carve-py#130 and markup-carve/carve-rs#4342"
 
 import zensical_carve
 from zensical_carve import CarveError, config, preprocess

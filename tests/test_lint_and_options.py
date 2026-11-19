@@ -9,7 +9,7 @@ from pathlib import Path
 import pytest
 
 #: The Carve 0.2 engine cannot register extensions yet.
-EXT_GAP = "extension registration not available yet in the Carve 0.2 engine: markup-carve/carve-rs#4329"
+EXT_GAP = "0.1 extension behavior awaits markup-carve/carve-py#130 and markup-carve/carve-rs#4342"
 
 import zensical_carve
 from zensical_carve import config, fence, lint, render
@@ -319,7 +319,7 @@ def test_allow_raw_html_is_read_from_the_table(tmp_path):
 
 
 def test_a_configured_extension_is_refused_until_the_engine_has_it():
-    with pytest.raises(zensical_carve.CarveError, match="not available yet"):
+    with pytest.raises(zensical_carve.CarveError, match="not a standard extension"):
         render("x", extensions=["details"])
 
 
