@@ -80,8 +80,8 @@ def render(
             "install zensical-carve with its dependencies"
         ) from error
 
-    # extension_options only ever comes with names, which the engine refuses
-    # until it can register extensions (markup-carve/carve-rs#4329).
+    # 0.1 extension names still in site configs need callbacks or transforms
+    # that the 0.2 Python binding does not expose yet (carve-py#130).
     names = list(extensions) if extensions else None
     options: dict[str, Any] = {}
     if symbols:

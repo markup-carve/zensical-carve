@@ -86,7 +86,7 @@ def main() -> int:
         # Settings both seams read. Zensical ignores a table it does not know,
         # which is what lets them live in its own configuration file.
         # No `extensions`: the Carve 0.2 engine cannot register them yet
-        # (markup-carve/carve-rs#4329), so the table carries only the emoji.
+        # (markup-carve/carve-py#130), so the table carries only the emoji.
         config += (
             "\n[tool.zensical-carve]\n"
             'emoji = "twemoji"\n'

@@ -122,10 +122,9 @@ emoji = "twemoji"
 docs-dir = "docs"
 ```
 
-> The Carve 0.2 engine cannot register extensions yet
-> ([carve-rs#4329](https://github.com/markup-carve/carve-rs/issues/4329)), so on
-> this branch any `extensions` entry or `--extension` flag is refused until it
-> lands.
+> The Carve 0.2 Python binding cannot register host callbacks or transforms yet
+> ([carve-py#130](https://github.com/markup-carve/carve-py/issues/130)), so on
+> this branch the old 0.1 extension names are refused until it lands.
 
 `zensical.toml` is read first - Zensical ignores a table it does not know, so
 the Carve settings sit next to the rest of the site's configuration - and
@@ -319,7 +318,7 @@ the PyO3 binding over the Rust engine, so a page here renders exactly as `carve`
 on the command line renders it.
 
 Carve's Tier-2 and Tier-3 extensions are **off unless you enable them** (and on
-this branch cannot be enabled yet, see carve-rs#4329), which is
+this branch cannot be enabled yet, see carve-py#130), which is
 the spec's own default and not a choice this plugin makes. Which ones you want is
 a project question, so nothing is turned on for you:
 
