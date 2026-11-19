@@ -48,6 +48,10 @@ Carve = "https://markup-carve.github.io/carve/"
 [project.scripts]
 zensical-carve = "zensical_carve.preprocess:main"
 
+# The next2 engine pin is a git URL (see `dependencies`).
+[tool.hatch.metadata]
+allow-direct-references = true
+
 [tool.hatch.build.targets.wheel]
 packages = ["src/zensical_carve"]
 
