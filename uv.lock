@@ -9,7 +9,7 @@ resolution-markers = [
 [[package]]
 name = "carve-lang"
 version = "0.1.13"
-source = { git = "https://github.com/markup-carve/carve-py?rev=791e2061eb949b3fdc6193892814e31ccb1f3e07#791e2061eb949b3fdc6193892814e31ccb1f3e07" }
+source = { git = "https://github.com/markup-carve/carve-py?rev=9c69086edc5933739d1381836f63fbeb5b7feadb#9c69086edc5933739d1381836f63fbeb5b7feadb" }
 
 [[package]]
 name = "click"
@@ -547,7 +547,7 @@ zensical = [
 
 [package.metadata]
 requires-dist = [
-    { name = "carve-lang", git = "https://github.com/markup-carve/carve-py?rev=791e2061eb949b3fdc6193892814e31ccb1f3e07" },
+    { name = "carve-lang", git = "https://github.com/markup-carve/carve-py?rev=9c69086edc5933739d1381836f63fbeb5b7feadb" },
     { name = "pygments-carve", specifier = ">=0.1.3,<0.2.0" },
     { name = "pymdown-extensions", specifier = ">=10.0" },
     { name = "pytest", marker = "extra == 'dev'", specifier = ">=8.0" },
