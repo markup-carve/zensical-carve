@@ -176,6 +176,14 @@ def test_headings_become_markdown_so_the_toc_can_see_them():
     assert "<h1>" not in out
 
 
+def test_the_carve_permalink_gives_way_to_the_theme_permalink():
+    html = render("# Intro\n\ntext\n", extensions=["heading-permalinks"])
+    assert 'class="permalink"' in html
+    out = adapt(html)
+    assert "# Intro {#Intro}" in out
+    assert "permalink" not in out
+
+
 def test_heading_keeps_its_own_id_and_classes():
     out = adapt('<section id="s"><h3 id="own" class="demo">T</h3></section>')
     assert "### T {#own .demo}" in out
