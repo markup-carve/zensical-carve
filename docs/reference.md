@@ -126,8 +126,9 @@ docs-dir = "docs"
 > `carve.mathBlock`, ...), each with its standard renderer. A 0.1 name such as
 > `details` or `math-block` is read as its 0.2 counterpart; see
 > [Which Carve features work](#which-carve-features-work).
-> Extension options are refused: the 0.2 Python binding enables an extension by
-> name only ([carve-py#142](https://github.com/markup-carve/carve-py/issues/142)).
+> An entry `{ name = { option = value } }` passes that extension's options to
+> the engine as written. The navigation extensions take no options yet
+> ([carve-py#145](https://github.com/markup-carve/carve-py/issues/145)).
 
 `zensical.toml` is read first - Zensical ignores a table it does not know, so
 the Carve settings sit next to the rest of the site's configuration - and
@@ -351,17 +352,20 @@ extension, and the 0.2 name works as well:
 | `index` | `carve.index` |
 | `img-fence` | `carve.imgFence.img`, `carve.imgFence.image` |
 | `tab-normalize` | `carve.tabNormalize` |
+| `heading-permalinks` | `carve.headingPermalinks` |
+| `heading-numbers` | `carve.headingNumbers` |
+| `heading-level-shift` | `carve.headingLevelShift` |
+| `heading-reference` | `carve.headingReference` |
+| `table-of-contents`, `toc` | `carve.toc` |
+| `external-links` | `carve.externalLinks` |
+| `autolink` | `carve.autolink` |
+| `link-policy` | `carve.linkPolicy` |
 
-The 0.2 engine has no `heading-permalinks`, `heading-numbers`,
-`heading-level-shift`, `heading-reference`, `table-of-contents`, `toc`,
-`external-links` or `autolink` yet
-([carve-rs#4476](https://github.com/markup-carve/carve-rs/issues/4476)); naming
-one is an error. In an included file an extension claims its construct only when
+`carve.tocPlacement` has no 0.1 name; give it as written. In an included file an extension claims its construct only when
 the including page uses that extension too
 ([carve-rs#4481](https://github.com/markup-carve/carve-rs/issues/4481)).
-`carve.extensions()` lists only five of the names
-([carve-py#140](https://github.com/markup-carve/carve-py/issues/140)). The sets
-below are starting points.
+`carve.extensions()` lists every name the installed engine has. The sets below
+are starting points.
 
 ### The Material-parity set
 
