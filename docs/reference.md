@@ -356,12 +356,13 @@ extension, and the 0.2 name works as well:
 | `heading-numbers` | `carve.headingNumbers` |
 | `heading-level-shift` | `carve.headingLevelShift` |
 | `heading-reference` | `carve.headingReference` |
-| `table-of-contents`, `toc` | `carve.toc` |
+| `table-of-contents` | `carve.toc` (a table at the top of the page) |
+| `toc` | `carve.tocPlacement` (a table where a `::: toc` block stands) |
 | `external-links` | `carve.externalLinks` |
 | `autolink` | `carve.autolink` |
 | `link-policy` | `carve.linkPolicy` |
 
-`carve.tocPlacement` has no 0.1 name; give it as written. In an included file an extension claims its construct only when
+In an included file an extension claims its construct only when
 the including page uses that extension too
 ([carve-rs#4481](https://github.com/markup-carve/carve-rs/issues/4481)).
 `carve.extensions()` lists every name the installed engine has. The sets below

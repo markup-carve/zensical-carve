@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 import sys
 import textwrap
 from pathlib import Path
@@ -318,7 +319,6 @@ def test_allow_raw_html_is_read_from_the_table(tmp_path):
         ("heading_numbers", "# Hi\n", '<span class="section-number">1</span>'),
         ("heading-level-shift", "# Hi\n", "<h2>Hi</h2>"),
         ("table-of-contents", "# Hi\n", '<nav class="toc"'),
-        ("toc", "# Hi\n", '<nav class="toc"'),
         ("external-links", "[x](https://example.org)\n", 'target="_blank"'),
         ("autolink", "See https://example.org\n", '<a href="https://example.org">'),
         ("heading-reference", "# Hi\n", "<h1>Hi</h1>"),
@@ -327,6 +327,12 @@ def test_allow_raw_html_is_read_from_the_table(tmp_path):
 )
 def test_each_navigation_extension_reaches_the_engine(name, source, visible):
     assert visible in render(source, extensions=[name])
+
+
+def test_the_0_1_toc_name_places_the_table_where_the_block_stands():
+    html = render("# A\n\n::: toc\n:::\n\n## B\n", extensions=["toc"])
+    assert re.search(r'<h1>A</h1>\s*<nav class="toc"', html)
+    assert not html.startswith("<nav")
 
 
 def test_lint_positions_count_characters_from_byte_offsets():
