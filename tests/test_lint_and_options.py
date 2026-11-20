@@ -2,18 +2,13 @@
 
 from __future__ import annotations
 
+import re
 import sys
 import textwrap
 from pathlib import Path
 
 import pytest
 
-#: The Carve 0.2 engine cannot register extensions yet.
-OPTIONS_GAP = "the 0.2 Python binding takes no extension options (markup-carve/carve-py#142)"
-WIKI_SYNTAX_GAP = (
-    "0.1 [[...]] wikilink syntax; 0.2 carve.wiki reads :wiki[...] and takes no options "
-    "(markup-carve/carve-py#142)"
-)
 
 import zensical_carve
 from zensical_carve import config, fence, lint, render
@@ -160,9 +155,8 @@ def test_a_malformed_extensions_entry_is_refused(tmp_path, entry):
 
 
 def test_render_passes_options_to_the_engine():
-    pytest.skip(OPTIONS_GAP)
     html = render(
-        "[[Foo Bar]]\n",
+        ":wiki[Foo Bar]\n",
         extensions=["wikilinks"],
         extension_options={"wikilinks": {"css_class": "wl", "new_window": True}},
     )
@@ -172,7 +166,7 @@ def test_render_passes_options_to_the_engine():
 
 def test_render_drops_options_for_an_extension_not_enabled():
     html = render(
-        "[[Foo Bar]]\n",
+        ":wiki[Foo Bar]\n",
         extensions=["details"],
         extension_options={"wikilinks": {"css_class": "wl"}},
     )
@@ -180,11 +174,10 @@ def test_render_drops_options_for_an_extension_not_enabled():
 
 
 def test_options_reach_a_whole_page(tmp_path, monkeypatch):
-    pytest.skip(OPTIONS_GAP)
     docs = _site(
         tmp_path,
         'extensions = [{ wikilinks = { css_class = "wl" } }]\n',
-        page="[[Foo Bar]]\n",
+        page=":wiki[Foo Bar]\n",
     )
     monkeypatch.chdir(tmp_path)
     assert main(["prepare"]) == 0
@@ -192,14 +185,13 @@ def test_options_reach_a_whole_page(tmp_path, monkeypatch):
 
 
 def test_options_reach_a_carve_fence(tmp_path, monkeypatch):
-    pytest.skip(OPTIONS_GAP)
     _site(tmp_path, 'extensions = [{ wikilinks = { css_class = "wl" } }]\n')
     monkeypatch.chdir(tmp_path)
     monkeypatch.delenv(config.SETTINGS_ENV, raising=False)
     monkeypatch.delenv(config.CONFIG_ENV, raising=False)
     zensical_carve._runtime.cache_clear()
     try:
-        html = fence("[[Foo Bar]]\n", "carve", "carve", {}, None)
+        html = fence(":wiki[Foo Bar]\n", "carve", "carve", {}, None)
     finally:
         zensical_carve._runtime.cache_clear()
     assert 'class="wl"' in html
@@ -219,11 +211,10 @@ def test_options_and_lint_round_trip_through_the_environment(monkeypatch, tmp_pa
 
 
 def test_an_extension_flag_drops_the_configured_options(tmp_path, monkeypatch):
-    pytest.skip(WIKI_SYNTAX_GAP)
     docs = _site(
         tmp_path,
         'extensions = [{ wikilinks = { css_class = "wl" } }]\n',
-        page="[[Foo Bar]]\n",
+        page=":wiki[Foo Bar]\n",
     )
     monkeypatch.chdir(tmp_path)
     assert main(["prepare", "--extension", "wikilinks"]) == 0
@@ -321,9 +312,27 @@ def test_allow_raw_html_is_read_from_the_table(tmp_path):
     assert config.load(path).allow_raw_html is True
 
 
-def test_a_configured_extension_is_refused_until_the_engine_has_it():
-    with pytest.raises(zensical_carve.CarveError, match="not a standard extension"):
-        render("x", extensions=["heading-permalinks"])
+@pytest.mark.parametrize(
+    "name,source,visible",
+    [
+        ("heading-permalinks", "# Hi\n", 'class="permalink"'),
+        ("heading_numbers", "# Hi\n", '<span class="section-number">1</span>'),
+        ("heading-level-shift", "# Hi\n", "<h2>Hi</h2>"),
+        ("table-of-contents", "# Hi\n", '<nav class="toc"'),
+        ("external-links", "[x](https://example.org)\n", 'target="_blank"'),
+        ("autolink", "See https://example.org\n", '<a href="https://example.org">'),
+        ("heading-reference", "# Hi\n", "<h1>Hi</h1>"),
+        ("link-policy", "[x](https://example.org)\n", '<a href="https://example.org">'),
+    ],
+)
+def test_each_navigation_extension_reaches_the_engine(name, source, visible):
+    assert visible in render(source, extensions=[name])
+
+
+def test_the_0_1_toc_name_places_the_table_where_the_block_stands():
+    html = render("# A\n\n::: toc\n:::\n\n## B\n", extensions=["toc"])
+    assert re.search(r'<h1>A</h1>\s*<nav class="toc"', html)
+    assert not html.startswith("<nav")
 
 
 def test_lint_positions_count_characters_from_byte_offsets():
@@ -397,9 +406,15 @@ def test_lint_receives_the_engine_extensions(monkeypatch):
     assert seen == [["carve.details"]]
 
 
-def test_options_for_an_enabled_extension_are_refused():
-    with pytest.raises(zensical_carve.CarveError, match="carve-py#142"):
-        render("x\n", extensions=["wikilinks"], extension_options={"wikilinks": {"css_class": "wl"}})
+def test_an_unknown_option_is_refused_by_the_engine():
+    with pytest.raises(zensical_carve.CarveError, match="url_template"):
+        render("x\n", extensions=["wikilinks"], extension_options={"wikilinks": {"url_template": "/w/{}"}})
+
+
+def test_navigation_extension_options_wait_on_the_binding():
+    pytest.skip("carve-py next2 refuses navigation extension options (markup-carve/carve-py#145)")
+    html = render("# Hi\n", extensions=["heading-permalinks"], extension_options={"heading-permalinks": {"symbol": "#"}})
+    assert ">#</a>" in html
 
 
 def test_a_whole_page_renders_the_configured_extension(tmp_path, monkeypatch):

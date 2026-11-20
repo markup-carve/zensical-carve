@@ -44,6 +44,8 @@ _ATTR = re.compile(r"""(?P<name>[-\w]+)\s*=\s*"(?P<value>[^"]*)\"""")
 _TASK_ITEM = re.compile(r'<li(?P<attrs>[^>]*)>(?P<space>\s*)<input type="checkbox"')
 _INJECTED_MARKUP = re.compile(r"<[a-zA-Z/]")
 _FIGURE_OPEN = re.compile(r"<figure(?P<attrs>[^>]*)>\s*")
+#: Carve's heading permalink; Zensical's ``toc.permalink`` adds its own.
+_PERMALINK = re.compile(r'\s*<a\b[^>]*\bclass="(?:[^"]*\s)?permalink(?:\s[^"]*)?"[^>]*>.*?</a>', re.DOTALL)
 
 
 def _attrs(raw: str) -> dict[str, str]:
@@ -70,7 +72,7 @@ def _heading_id(section_ids: list[str], attrs: dict[str, str]) -> str:
 
 def _markdown_heading(level: int, text: str, ident: str, classes: str) -> str:
     """A Markdown heading line, with attr_list carrying id and classes."""
-    text = " ".join(text.split())
+    text = " ".join(_PERMALINK.sub("", text).split())
     parts = []
     if ident:
         parts.append(f"#{ident}")

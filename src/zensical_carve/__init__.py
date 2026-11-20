@@ -37,11 +37,13 @@ class CarveError(RuntimeError):
 #: The 0.2 standard extensions each 0.1 extension name stands for. A name
 #: missing here and not starting with ``carve.`` reaches the engine as written.
 LEGACY_EXTENSIONS: dict[str, list[str]] = {
+    "autolink": ["carve.autolink"],
     "citations": ["carve.references"],
     "code-callouts": ["carve.codeCallouts"],
     "code-group": ["carve.codeGroup"],
     "color-swatch": ["carve.colorSwatch"],
     "details": ["carve.details"],
+    "external-links": ["carve.externalLinks"],
     "fenced-render": ["carve.fencedRender.mermaid"],
     "fenced-render-abc": ["carve.fencedRender.abc"],
     "fenced-render-chart": ["carve.fencedRender.chart"],
@@ -51,34 +53,34 @@ LEGACY_EXTENSIONS: dict[str, list[str]] = {
     "fenced-render-vega-lite": ["carve.fencedRender.vega-lite"],
     "fenced-render-wavedrom": ["carve.fencedRender.wavedrom"],
     "glossary": ["carve.glossary"],
+    "heading-level-shift": ["carve.headingLevelShift"],
+    "heading-numbers": ["carve.headingNumbers"],
+    "heading-permalinks": ["carve.headingPermalinks"],
+    "heading-reference": ["carve.headingReference"],
     "img-fence": ["carve.imgFence.img", "carve.imgFence.image"],
     "index": ["carve.index"],
+    "link-policy": ["carve.linkPolicy"],
     "list-table": ["carve.listTable"],
     "math-block": ["carve.mathBlock"],
     "semantic-span": ["carve.semanticSpan"],
     "smart-quotes": ["carve.smartQuotes"],
     "spoiler": ["carve.spoiler", "carve.spoilerBlock"],
     "tab-normalize": ["carve.tabNormalize"],
+    "table-of-contents": ["carve.toc"],
     "tabs": ["carve.tabs"],
+    "toc": ["carve.tocPlacement"],
     "wikilinks": ["carve.wiki"],
 }
 
-#: 0.1 extensions the 0.2 engine does not have yet.
-PENDING_EXTENSIONS = frozenset(
-    {
-        "autolink",
-        "external-links",
-        "heading-level-shift",
-        "heading-numbers",
-        "heading-permalinks",
-        "heading-reference",
-        "table-of-contents",
-        "toc",
-    }
-)
-
 #: Standard extensions without a standard renderer in the engine.
 _NO_RENDERER = frozenset({"carve.cite"})
+
+
+def _targets(name: str) -> list[str]:
+    """The 0.2 standard extension names one configured ``name`` stands for."""
+    if name.startswith("carve."):
+        return [name]
+    return LEGACY_EXTENSIONS.get(name.replace("_", "-"), [name])
 
 
 def engine_extensions(names: Sequence[str] | None) -> list[str]:
@@ -88,30 +90,26 @@ def engine_extensions(names: Sequence[str] | None) -> list[str]:
     """
     resolved: list[str] = []
     for name in names or ():
-        if name.startswith("carve."):
-            targets = [name]
-        else:
-            key = name.replace("_", "-")
-            if key in PENDING_EXTENSIONS:
-                raise CarveError(
-                    f"{name} is not a standard extension of the 0.2 engine yet "
-                    "(markup-carve/carve-rs#4476)"
-                )
-            targets = LEGACY_EXTENSIONS.get(key, [name])
-        resolved.extend(t for t in targets if t not in resolved)
+        resolved.extend(t for t in _targets(name) if t not in resolved)
     return resolved
 
 
-def _refuse_extension_options(
+def _entries(
     names: Sequence[str] | None, options: Mapping[str, Mapping[str, Any]] | None
-) -> None:
+) -> list[Any]:
+    """The engine ``extensions`` list: a name, or a configured entry with options.
+
+    Options for a name not in ``names`` are dropped.
+    """
+    configured: dict[str, dict[str, Any]] = {}
     for name, values in (options or {}).items():
         if values and names and name in names:
-            raise CarveError(
-                f"{name}: options {sorted(values)} are not supported: the Carve 0.2 "
-                "Python binding enables a standard extension by name only "
-                "(markup-carve/carve-py#142)"
-            )
+            for target in _targets(name):
+                configured[target] = dict(values)
+    return [
+        {"name": n, "options": configured[n]} if n in configured else n
+        for n in engine_extensions(names)
+    ]
 
 
 def render(
@@ -132,9 +130,8 @@ def render(
         extensions: Optional Carve 0.2 standard extension names, each enabled
             with its standard renderer. A 0.1 name is read as its 0.2
             counterpart (``LEGACY_EXTENSIONS``).
-        extension_options: Options per extension name. Options for a name
-            not in ``extensions`` are dropped; options for an enabled name are
-            refused, because the 0.2 binding takes names only.
+        extension_options: Options per extension name, passed to the engine
+            as written. Options for a name not in ``extensions`` are dropped.
         symbols: Optional map from a `:name:` symbol to what it renders as.
             The engine substitutes the value RAW, so a value carrying markup
             reaches the page as markup - which is what the twemoji mode in
@@ -161,11 +158,11 @@ def render(
             "install zensical-carve with its dependencies"
         ) from error
 
-    _refuse_extension_options(extensions, extension_options)
-    names = engine_extensions(extensions)
+    entries = _entries(extensions, extension_options)
+    names = [e if isinstance(e, str) else e["name"] for e in entries]
     options: dict[str, Any] = {}
     if names:
-        options["extensions"] = names
+        options["extensions"] = entries
         options["renderers"] = {n: "standard" for n in names if n not in _NO_RENDERER}
     if symbols:
         options["symbols"] = dict(symbols)
