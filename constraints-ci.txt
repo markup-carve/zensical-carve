@@ -44,4 +44,4 @@
 # The four that moved are ordinary document constructs, and
 # `tests/test_rendering_rulings.py` is what gives the canary something to fail
 # on.
-carve-lang @ git+https://github.com/markup-carve/carve-py@9c69086edc5933739d1381836f63fbeb5b7feadb
+carve-lang @ git+https://github.com/markup-carve/carve-py@8444f42cb4c2a73517be9781144f57d8fff5960d

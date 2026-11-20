@@ -28,7 +28,7 @@ dependencies = [
   # unreleased Carve 0.2 binding, pinned to a carve-py `next2` commit and built
   # from source (Rust and maturin are needed). A direct-URL dependency cannot be
   # published to PyPI, so this branch is not releasable until carve-lang 0.2 is.
-  "carve-lang @ git+https://github.com/markup-carve/carve-py@9c69086edc5933739d1381836f63fbeb5b7feadb",
+  "carve-lang @ git+https://github.com/markup-carve/carve-py@8444f42cb4c2a73517be9781144f57d8fff5960d",
   "pygments-carve>=0.1.3,<0.2.0",
   "pymdown-extensions>=10.0",
   "tomli>=2.0; python_version < '3.11'",
