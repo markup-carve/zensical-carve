@@ -341,7 +341,7 @@ extension, and the 0.2 name works as well:
 | `list-table` | `carve.listTable` |
 | `math-block` | `carve.mathBlock` |
 | `fenced-render` | `carve.fencedRender.mermaid` |
-| `fenced-render-<word>` | `carve.fencedRender.<word>` |
+| `fenced-render-<word>` | `carve.fencedRender.<word>` (`graphviz` also claims `dot`, `plantuml` also `puml`, as in 0.1) |
 | `semantic-span` | `carve.semanticSpan` |
 | `smart-quotes` | `carve.smartQuotes` |
 | `color-swatch` | `carve.colorSwatch` |

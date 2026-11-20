@@ -346,7 +346,7 @@ def test_a_standard_extension_renders_with_its_standard_renderer():
     [
         ("details", ["carve.details"]),
         ("math_block", ["carve.mathBlock"]),
-        ("fenced-render-graphviz", ["carve.fencedRender.graphviz"]),
+        ("fenced-render-graphviz", ["carve.fencedRender.graphviz", "carve.fencedRender.dot"]),
         ("spoiler", ["carve.spoiler", "carve.spoilerBlock"]),
     ],
 )
@@ -407,3 +407,8 @@ def test_a_whole_page_renders_the_configured_extension(tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
     assert main(["prepare"]) == 0
     assert "<details>" in (docs / "page.md").read_text(encoding="utf-8")
+
+
+def test_the_graphviz_name_claims_the_dot_fence_as_in_0_1():
+    html = render("``` dot\ndigraph{a->b}\n```\n", extensions=["fenced-render-graphviz"])
+    assert '<pre class="graphviz"' in html
