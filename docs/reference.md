@@ -122,6 +122,13 @@ emoji = "twemoji"
 docs-dir = "docs"
 ```
 
+> `extensions` takes the Carve 0.2 standard extension names (`carve.details`,
+> `carve.mathBlock`, ...), each with its standard renderer. A 0.1 name such as
+> `details` or `math-block` is read as its 0.2 counterpart; see
+> [Which Carve features work](#which-carve-features-work).
+> An entry `{ name = { option = value } }` passes that extension's options to
+> the engine as written, including navigation extension options.
+
 `zensical.toml` is read first - Zensical ignores a table it does not know, so
 the Carve settings sit next to the rest of the site's configuration - and
 `pyproject.toml` is read when `zensical.toml` has no table. A flag beats the
@@ -132,11 +139,12 @@ that one run. `--config FILE` points at a file directly.
 | --- | --- |
 | `extensions` | list of Carve extension names; an entry `{ name = { option = value } }` also sets that extension's options |
 | `lint` | `true` to report lint findings on every page while preparing, default `false` |
-| `caption-hints` | `true` to add the opt-in `caption-looking-paragraph` hint, default `false` |
+| `caption-hints` | kept for 0.1 configurations; `caption-looking-paragraph` is on by default in Carve 0.2 |
 | `emoji` | `none` (default), `unicode`, or `twemoji` |
 | `symbols` | inline table, or a path to a JSON object, mapping a name to what `:name:` renders as |
 | `docs-dir` | the directory to walk, default `docs` |
 | `raw-html` | `true` to skip the theme adaptation |
+| `allow-raw-html` | `true` to emit `=html` blocks and spans verbatim; Carve 0.2 escapes them by default |
 | `prerender` | list of diagram languages to draw at build time |
 | `prerender-url` | a Kroki instance, default `https://kroki.io` |
 | `prerender-command` | per-language command line, for a local binary |
@@ -205,22 +213,24 @@ line with a comment above it:
 ---
 ```
 
-`caption-hints = true` (or `--caption-hints`) adds `caption-looking-paragraph`,
-which flags a paragraph beside an image or table that reads like a caption and
-should be a `^` caption line.
+`caption-looking-paragraph` flags a paragraph beside an image or table that
+reads like a caption and should be a `^` caption line. It is on by default in
+Carve 0.2, so `caption-hints` no longer changes anything.
 
 With includes on, the linter follows them and checks every included Carve file
-too. A finding inside one names the page, the included file and the include
-site:
+too. A finding inside one names the page and the included file. The Carve 0.2
+diagnostic carries no include chain, so the 0.1 "(included at ...)" suffix is
+gone:
 
 ```
-zensical-carve: WARNING: docs/page.crv: parts/frag.crv:3:1: unattached-block-attribute: ... (included at page.crv:3:1)
+zensical-carve: WARNING: docs/page.crv: parts/frag.crv:3:1: unattached-block-attribute: ...
 ```
 
 During `prepare` and `build` an include that cannot be expanded is reported
 once, by the include warning, and not again by the linter. `zensical-carve
-lint` renders nothing, so there it reports such an include (`include-unresolved`,
-`include-non-text`) as a finding and exits 1.
+lint` renders nothing, so there it reports such an include (`include-not-found`,
+`include-non-text`) as a finding and exits 1. Without includes, each directive is
+reported as `include-no-resolver`.
 
 A generated page carries `zensical_carve: generated` in its front matter. That
 marker is what `clean` deletes on, and what stops `prepare` from overwriting a
@@ -246,10 +256,10 @@ than resolved, because resolving it lands on whatever directory the build ran
 from, which is not a root anyone chose.
 
 A target that cannot be read is reported against the page that asked for it, and
-the directive is left as written. The message does not say whether the file was
-missing or refused by containment: both report `include-unresolved`, so a page
-cannot be used to probe the filesystem. The class is printed on its own line for
-the build's log.
+the directive is left as written. The code names the cause: `include-not-found`,
+`include-outside-root`, `include-cycle` and the other codes of Carve 0.2
+(C2-N-061). A directive inside a sentence is text in 0.2 and is never expanded
+(C2-N-002).
 
 With `includes = true`, a whole Carve page can select a named region:
 
@@ -318,7 +328,44 @@ a project question, so nothing is turned on for you:
 zensical-carve prepare --extension fenced-render --extension details
 ```
 
-`carve.extensions()` lists all 32 names. The sets below are starting points.
+The names below are the 0.1 spellings; each is read as its Carve 0.2 standard
+extension, and the 0.2 name works as well:
+
+| 0.1 name | 0.2 extension |
+| --- | --- |
+| `details` | `carve.details` |
+| `spoiler` | `carve.spoiler`, `carve.spoilerBlock` |
+| `tabs` | `carve.tabs` |
+| `code-group` | `carve.codeGroup` |
+| `code-callouts` | `carve.codeCallouts` |
+| `list-table` | `carve.listTable` |
+| `math-block` | `carve.mathBlock` |
+| `fenced-render` | `carve.fencedRender.mermaid` |
+| `fenced-render-<word>` | `carve.fencedRender.<word>` (`graphviz` also claims `dot`, `plantuml` also `puml`, as in 0.1) |
+| `semantic-span` | `carve.semanticSpan` |
+| `smart-quotes` | `carve.smartQuotes` |
+| `color-swatch` | `carve.colorSwatch` |
+| `wikilinks` | `carve.wiki` |
+| `citations` | `carve.references` |
+| `glossary` | `carve.glossary` |
+| `index` | `carve.index` |
+| `img-fence` | `carve.imgFence.img`, `carve.imgFence.image` |
+| `tab-normalize` | `carve.tabNormalize` |
+| `heading-permalinks` | `carve.headingPermalinks` |
+| `heading-numbers` | `carve.headingNumbers` |
+| `heading-level-shift` | `carve.headingLevelShift` |
+| `heading-reference` | `carve.headingReference` |
+| `table-of-contents` | `carve.toc` (a table at the top of the page) |
+| `toc` | `carve.tocPlacement` (a table where a `::: toc` block stands) |
+| `external-links` | `carve.externalLinks` |
+| `autolink` | `carve.autolink` |
+| `link-policy` | `carve.linkPolicy` |
+
+In an included file an extension claims its construct only when
+the including page uses that extension too
+([carve-rs#4481](https://github.com/markup-carve/carve-rs/issues/4481)).
+`carve.extensions()` lists every name the installed engine has. The sets below
+are starting points.
 
 ### The Material-parity set
 

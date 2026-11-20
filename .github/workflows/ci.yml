@@ -2,7 +2,7 @@ name: CI
 
 on:
   push:
-    branches: [main]
+    branches: [main, next2]
   pull_request:
 
 # Every job below carries a timeout-minutes bound. Without one a job inherits
@@ -32,6 +32,12 @@ jobs:
         run: |
           resolved="$(python -c 'from importlib.metadata import version; print(version("carve-lang"))')"
           pinned="$(sed -n 's/^carve-lang==\([^ ;#]*\).*/\1/p' constraints-ci.txt)"
+          # A carve-py git pin: compare the commit pip recorded for the install.
+          sha="$(sed -n 's|^carve-lang @ git+https://github.com/markup-carve/carve-py@\([0-9a-f]\{40\}\)$|\1|p' constraints-ci.txt)"
+          if [ -n "$sha" ]; then
+            pinned="$sha"
+            resolved="$(python -c 'import json; from importlib.metadata import distribution; print(json.loads(distribution("carve-lang").read_text("direct_url.json"))["vcs_info"]["commit_id"])')"
+          fi
           echo "carve-lang resolved=${resolved} pinned=${pinned}"
           if [ -z "$pinned" ]; then
             echo "::error::constraints-ci.txt names no carve-lang pin, so this run measured an unstated engine"
@@ -65,6 +71,12 @@ jobs:
         run: |
           resolved="$(python -c 'from importlib.metadata import version; print(version("carve-lang"))')"
           pinned="$(sed -n 's/^carve-lang==\([^ ;#]*\).*/\1/p' constraints-ci.txt)"
+          # A carve-py git pin: compare the commit pip recorded for the install.
+          sha="$(sed -n 's|^carve-lang @ git+https://github.com/markup-carve/carve-py@\([0-9a-f]\{40\}\)$|\1|p' constraints-ci.txt)"
+          if [ -n "$sha" ]; then
+            pinned="$sha"
+            resolved="$(python -c 'import json; from importlib.metadata import distribution; print(json.loads(distribution("carve-lang").read_text("direct_url.json"))["vcs_info"]["commit_id"])')"
+          fi
           echo "carve-lang resolved=${resolved} pinned=${pinned}"
           if [ -z "$pinned" ]; then
             echo "::error::constraints-ci.txt names no carve-lang pin, so this run measured an unstated engine"

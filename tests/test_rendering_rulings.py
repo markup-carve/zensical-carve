@@ -38,6 +38,13 @@ wrong; a direction is a claim this package can hold the engine to.
 from __future__ import annotations
 
 import carve
+import pytest
+
+#: The Carve 0.2 engine cannot register extensions yet.
+DIRECT_GAP = (
+    "a 0.1 extension name passed straight to the 0.2 binding; zensical_carve.render "
+    "maps it (test_a_mermaid_fence_renders_on_a_pre)"
+)
 
 
 def _version() -> str:
@@ -70,7 +77,9 @@ def test_a_cross_reference_differing_only_in_case_stays_literal():
 
 
 def test_explicit_table_body_counts_are_consumed_not_published():
-    source = "{header-rows=1 body-rows=1,1}\n| H | G |\n| a | b |\n| c | d |\n"
+    # U-058, U-271: 0.2 has no header-rows on a pipe table; the head is the
+    # leading row of header cells (C2-B-178), and body-rows splits the rest.
+    source = "{body-rows=1,1}\n|= H |= G |\n| a | b |\n| c | d |\n"
     html = carve.to_html(source)
     assert "body-rows=" not in html, (
         f"carve-lang {_version()} published the row-count metadata as an HTML "
@@ -106,6 +115,7 @@ def test_a_mermaid_block_still_reaches_the_prerender_matcher_shape():
     is the engine end of the contract - the block still carries a `class` the
     matcher keys on, whatever else the engine has started writing beside it.
     """
+    pytest.skip(DIRECT_GAP)
     html = carve.to_html("``` mermaid\ngraph TD; A-->B;\n```\n", extensions=["fenced-render"])
     assert '<pre class="mermaid"' in html, (
         f"carve-lang {_version()} no longer emits a class-bearing <pre> for a "

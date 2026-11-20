@@ -77,7 +77,8 @@ def test_a_configured_root_is_handed_back_as_written(site):
 def test_a_relative_root_is_refused_by_the_engine(site):
     with pytest.raises(CarveError) as caught:
         _convert(site, "index.crv", "{{ sub/frag.crv }}\n", "fragments")
-    assert "absolute" in str(caught.value)
+    # C2-N-014: still refused; the 0.2 engine says the root cannot be read.
+    assert "include root" in str(caught.value)
 
 
 def test_a_wider_root_reaches_the_engine(site):
@@ -97,16 +98,15 @@ def test_traversal_out_of_the_root_is_not_expanded(site):
 
 
 def test_the_reported_warning_does_not_say_which_denial_it_was(site, capsys):
-    """Spec I7: one warning for both, so a page cannot probe the filesystem."""
+    """0.1 spec I7 collapsed both causes; 0.2 reports one code per cause (C2-N-061)."""
     root = str((site / "docs").resolve())
     _convert(site, "index.crv", "{{ ../outside/secret.crv }}\n", root)
     lines = [
         line
         for line in capsys.readouterr().err.splitlines()
-        if "include-unresolved" in line
+        if "include-outside-root" in line
     ]
     assert lines, "a refused include reported nothing"
-    assert not any("outside-root" in line for line in lines)
 
 
 def test_the_denial_class_is_still_reported(site, capsys):
@@ -128,7 +128,8 @@ def test_a_warning_names_the_page_that_asked(site, capsys):
     root = str((site / "docs").resolve())
     _convert(site, "guide.crv", "{{ nope.crv }}\n", root)
     lines = capsys.readouterr().err.splitlines()
-    assert any("guide.crv" in line and "include-unresolved" in line for line in lines)
+    # C2-N-061: the 0.2 code names the cause.
+    assert any("guide.crv" in line and "include-not-found" in line for line in lines)
 
 
 def test_the_engine_reported_location_stays_relative_to_the_root(site, capsys):
@@ -141,7 +142,10 @@ def test_the_engine_reported_location_stays_relative_to_the_root(site, capsys):
     root = str((site / "docs" / "sub").resolve())
     _convert(site, "index.crv", "{{ nope.crv }}\n", root)
     err = capsys.readouterr().err
-    assert f"{os.pardir}{os.sep}index.crv: include-unresolved" in err
+    # A 0.2 diagnostic for the entry document carries no location of its own
+    # (C2-N-068), so the only host path on the line is the build's own prefix.
+    assert "include-outside-root" in err
+    assert err.count(str(site)) == 1, err
 
 
 # --- what the engine is asked to do ---------------------------------------
@@ -167,11 +171,12 @@ def test_nested_relative_paths_resolve_against_the_including_file(site):
 
 
 def test_a_cycle_degrades_instead_of_hanging(site, capsys):
-    (site / "docs" / "a.crv").write_text("A {{ b.crv }}\n", encoding="utf-8")
-    (site / "docs" / "b.crv").write_text("B {{ a.crv }}\n", encoding="utf-8")
+    # C2-N-002: no inline include in 0.2, so each directive is on its own line.
+    (site / "docs" / "a.crv").write_text("A\n\n{{ b.crv }}\n", encoding="utf-8")
+    (site / "docs" / "b.crv").write_text("B\n\n{{ a.crv }}\n", encoding="utf-8")
     root = str((site / "docs").resolve())
     text = _convert(site, "index.crv", "{{ a.crv }}\n", root)
-    assert "A B" in text
+    assert "<p>A</p>" in text and "<p>B</p>" in text
     assert "include-cycle" in capsys.readouterr().err
 
 

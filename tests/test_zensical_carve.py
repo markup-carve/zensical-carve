@@ -176,6 +176,14 @@ def test_headings_become_markdown_so_the_toc_can_see_them():
     assert "<h1>" not in out
 
 
+def test_the_carve_permalink_gives_way_to_the_theme_permalink():
+    html = render("# Intro\n\ntext\n", extensions=["heading-permalinks"])
+    assert 'class="permalink"' in html
+    out = adapt(html)
+    assert "# Intro {#Intro}" in out
+    assert "permalink" not in out
+
+
 def test_heading_keeps_its_own_id_and_classes():
     out = adapt('<section id="s"><h3 id="own" class="demo">T</h3></section>')
     assert "### T {#own .demo}" in out
@@ -217,7 +225,8 @@ def test_task_states_keep_their_attributes_and_theme_classes():
     for marker, state in (("_", "_"), ("/", "/"), ("!", "!")):
         out = adapt(to_html(f"- [{marker}] task"))
         assert 'class="task-list"' in out
-        assert 'class="task-list-item"' in out
+        # U-159: the 0.2 item carries class="task", kept after the theme class.
+        assert 'class="task-list-item task"' in out
         assert f'data-task-state="{state}"' in out
         assert '<input type="checkbox"' in out
 
@@ -884,12 +893,13 @@ def test_output_that_does_not_end_the_svg_is_a_failure(tmp_path):
 def _engine_diagram_html(language: str = "graphviz", source: str = "digraph{a->b}") -> str:
     import carve
 
+    name = f"carve.fencedRender.{language}"
     extensions = list(carve.extensions())
-    assert f"fenced-render-{language}" in extensions, (
-        f"the installed carve-lang has no fenced-render-{language} extension, "
+    assert name in extensions, (
+        f"the installed carve-lang has no {name} extension, "
         f"so this test measured nothing: {extensions}"
     )
-    return render(f"``` {language}\n{source}\n```\n", extensions=extensions)
+    return render(f"``` {language}\n{source}\n```\n", extensions=[name])
 
 
 def test_a_diagram_from_the_installed_engine_becomes_a_picture(tmp_path):

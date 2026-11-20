@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Port to Carve 0.2: pages, fences and lint go through the carve-py `next2`
+  Carve 0.2 binding, pinned by commit. HTML follows 0.2 (see the spec's
+  `UPGRADING.md`).
+- Raw HTML is escaped by default; the new `allow-raw-html` setting (and
+  `--allow-raw-html`) emits it verbatim.
+- A configured extension is refused until the engine can register extensions
+  (markup-carve/carve-rs#4329).
+- Include warnings name the cause (`include-not-found`, `include-outside-root`,
+  ...) instead of one `include-unresolved`. Lint lines for included files drop
+  the "(included at ...)" suffix; without includes, lint reports each directive
+  as `include-no-resolver`. `caption-looking-paragraph` is on by default.
+
 ## [0.1.7] - 2026-11-12
 
 Zensical sites move to carve-lang 0.1.13, gain the `caption-hints` option, and lift front matter the way the engine reads it.
