@@ -54,9 +54,12 @@ Frontmatter is copied to the generated page for Zensical to read.
 Settings may live in `[tool.zensical-carve]` inside `zensical.toml` or
 `pyproject.toml`.
 
-> The Carve 0.2 Python binding cannot register host callbacks or transforms yet
-> ([carve-py#130](https://github.com/markup-carve/carve-py/issues/130)), so on
-> this branch the old 0.1 extension names are refused until it lands.
+> `extensions` takes the Carve 0.2 standard extension names (`carve.details`,
+> `carve.mathBlock`, ...), each with its standard renderer. A 0.1 name such as
+> `details` or `math-block` is read as its 0.2 counterpart; see
+> [Which Carve features work](reference.md#which-carve-features-work).
+> Extension options are refused: the 0.2 Python binding enables an extension by
+> name only ([carve-py#142](https://github.com/markup-carve/carve-py/issues/142)).
 
 
 ```toml

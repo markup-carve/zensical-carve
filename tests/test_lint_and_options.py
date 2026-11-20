@@ -9,7 +9,11 @@ from pathlib import Path
 import pytest
 
 #: The Carve 0.2 engine cannot register extensions yet.
-EXT_GAP = "0.1 extension behavior awaits markup-carve/carve-py#130 and markup-carve/carve-rs#4342"
+OPTIONS_GAP = "the 0.2 Python binding takes no extension options (markup-carve/carve-py#142)"
+WIKI_SYNTAX_GAP = (
+    "0.1 [[...]] wikilink syntax; 0.2 carve.wiki reads :wiki[...] and takes no options "
+    "(markup-carve/carve-py#142)"
+)
 
 import zensical_carve
 from zensical_carve import config, fence, lint, render
@@ -156,7 +160,7 @@ def test_a_malformed_extensions_entry_is_refused(tmp_path, entry):
 
 
 def test_render_passes_options_to_the_engine():
-    pytest.skip(EXT_GAP)
+    pytest.skip(OPTIONS_GAP)
     html = render(
         "[[Foo Bar]]\n",
         extensions=["wikilinks"],
@@ -167,7 +171,6 @@ def test_render_passes_options_to_the_engine():
 
 
 def test_render_drops_options_for_an_extension_not_enabled():
-    pytest.skip(EXT_GAP)
     html = render(
         "[[Foo Bar]]\n",
         extensions=["details"],
@@ -177,7 +180,7 @@ def test_render_drops_options_for_an_extension_not_enabled():
 
 
 def test_options_reach_a_whole_page(tmp_path, monkeypatch):
-    pytest.skip(EXT_GAP)
+    pytest.skip(OPTIONS_GAP)
     docs = _site(
         tmp_path,
         'extensions = [{ wikilinks = { css_class = "wl" } }]\n',
@@ -189,7 +192,7 @@ def test_options_reach_a_whole_page(tmp_path, monkeypatch):
 
 
 def test_options_reach_a_carve_fence(tmp_path, monkeypatch):
-    pytest.skip(EXT_GAP)
+    pytest.skip(OPTIONS_GAP)
     _site(tmp_path, 'extensions = [{ wikilinks = { css_class = "wl" } }]\n')
     monkeypatch.chdir(tmp_path)
     monkeypatch.delenv(config.SETTINGS_ENV, raising=False)
@@ -216,7 +219,7 @@ def test_options_and_lint_round_trip_through_the_environment(monkeypatch, tmp_pa
 
 
 def test_an_extension_flag_drops_the_configured_options(tmp_path, monkeypatch):
-    pytest.skip(EXT_GAP)
+    pytest.skip(WIKI_SYNTAX_GAP)
     docs = _site(
         tmp_path,
         'extensions = [{ wikilinks = { css_class = "wl" } }]\n',
@@ -320,10 +323,92 @@ def test_allow_raw_html_is_read_from_the_table(tmp_path):
 
 def test_a_configured_extension_is_refused_until_the_engine_has_it():
     with pytest.raises(zensical_carve.CarveError, match="not a standard extension"):
-        render("x", extensions=["details"])
+        render("x", extensions=["heading-permalinks"])
 
 
 def test_lint_positions_count_characters_from_byte_offsets():
     findings = [f for f in lint("äb\n\n{#a}\n") if f["rule"] == "unattached-block-attribute"]
     assert [(f["line"], f["column"]) for f in findings] == [(3, 1)]
     assert zensical_carve._position("äü {", len("äü ".encode("utf-8"))) == (1, 4)
+
+
+# --- 0.2 standard extensions -----------------------------------------------
+
+DETAILS = "::: details\nBody\n:::\n"
+
+
+def test_a_standard_extension_renders_with_its_standard_renderer():
+    assert "<details>" in render(DETAILS, extensions=["carve.details"])
+
+
+@pytest.mark.parametrize(
+    ("name", "expected"),
+    [
+        ("details", ["carve.details"]),
+        ("math_block", ["carve.mathBlock"]),
+        ("fenced-render-graphviz", ["carve.fencedRender.graphviz", "carve.fencedRender.dot"]),
+        ("spoiler", ["carve.spoiler", "carve.spoilerBlock"]),
+    ],
+)
+def test_a_0_1_name_reads_as_its_0_2_extension(name, expected):
+    assert zensical_carve.engine_extensions([name]) == expected
+
+
+def test_a_mermaid_fence_renders_on_a_pre():
+    html = render("``` mermaid\ngraph TD; A-->B;\n```\n", extensions=["fenced-render"])
+    assert '<pre class="mermaid"' in html
+
+
+def test_the_extension_set_reaches_the_include_path(tmp_path):
+    (tmp_path / "frag.crv").write_text(DETAILS, encoding="utf-8")
+    html = render(
+        DETAILS + "\n{{ frag.crv }}\n",
+        extensions=["details"],
+        include_root=str(tmp_path),
+        source_path="page.crv",
+    )
+    assert html.count("<details>") == 2
+
+
+def test_the_extension_set_reaches_an_included_page_alone(tmp_path):
+    pytest.skip("markup-carve/carve-rs#4481")
+    (tmp_path / "frag.crv").write_text(DETAILS, encoding="utf-8")
+    html = render(
+        "{{ frag.crv }}\n",
+        extensions=["details"],
+        include_root=str(tmp_path),
+        source_path="page.crv",
+    )
+    assert "<details>" in html
+
+
+def test_lint_receives_the_engine_extensions(monkeypatch):
+    import carve
+
+    seen = []
+    real = carve.lint
+
+    def spy(source, options=None):
+        seen.append((options or {}).get("extensions"))
+        return real(source, options)
+
+    monkeypatch.setattr(carve, "lint", spy)
+    lint("text\n", extensions=["details"])
+    assert seen == [["carve.details"]]
+
+
+def test_options_for_an_enabled_extension_are_refused():
+    with pytest.raises(zensical_carve.CarveError, match="carve-py#142"):
+        render("x\n", extensions=["wikilinks"], extension_options={"wikilinks": {"css_class": "wl"}})
+
+
+def test_a_whole_page_renders_the_configured_extension(tmp_path, monkeypatch):
+    docs = _site(tmp_path, 'extensions = ["details"]\n', page=DETAILS)
+    monkeypatch.chdir(tmp_path)
+    assert main(["prepare"]) == 0
+    assert "<details>" in (docs / "page.md").read_text(encoding="utf-8")
+
+
+def test_the_graphviz_name_claims_the_dot_fence_as_in_0_1():
+    html = render("``` dot\ndigraph{a->b}\n```\n", extensions=["fenced-render-graphviz"])
+    assert '<pre class="graphviz"' in html

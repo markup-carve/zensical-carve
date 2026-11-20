@@ -8,6 +8,8 @@ Zensical integration for Carve blocks and `.crv` pages, using the Carve 0.2 engi
 pip install zensical-carve
 ```
 
+On this branch the Carve engine is a carve-py `next2` commit that pip builds from source, which needs Rust 1.88 or newer.
+
 ## Usage
 
 ```sh

@@ -41,7 +41,10 @@ import carve
 import pytest
 
 #: The Carve 0.2 engine cannot register extensions yet.
-EXT_GAP = "0.1 extension behavior awaits markup-carve/carve-py#130 and markup-carve/carve-rs#4342"
+DIRECT_GAP = (
+    "a 0.1 extension name passed straight to the 0.2 binding; zensical_carve.render "
+    "maps it (test_a_mermaid_fence_renders_on_a_pre)"
+)
 
 
 def _version() -> str:
@@ -112,7 +115,7 @@ def test_a_mermaid_block_still_reaches_the_prerender_matcher_shape():
     is the engine end of the contract - the block still carries a `class` the
     matcher keys on, whatever else the engine has started writing beside it.
     """
-    pytest.skip(EXT_GAP)
+    pytest.skip(DIRECT_GAP)
     html = carve.to_html("``` mermaid\ngraph TD; A-->B;\n```\n", extensions=["fenced-render"])
     assert '<pre class="mermaid"' in html, (
         f"carve-lang {_version()} no longer emits a class-bearing <pre> for a "
