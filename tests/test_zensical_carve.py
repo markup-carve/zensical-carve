@@ -16,7 +16,10 @@ from pathlib import Path
 import pytest
 
 #: The Carve 0.2 engine cannot register extensions yet.
-EXT_GAP = "0.1 extension behavior awaits markup-carve/carve-py#130 and markup-carve/carve-rs#4342"
+LIST_GAP = (
+    "carve.extensions() lists 5 of the standard extensions in 0.2, not fenced-render-* "
+    "(markup-carve/carve-py#140)"
+)
 import yaml
 
 from zensical_carve import CarveError, config, fence, prerender, render, symbols
@@ -898,7 +901,7 @@ def _engine_diagram_html(language: str = "graphviz", source: str = "digraph{a->b
 
 def test_a_diagram_from_the_installed_engine_becomes_a_picture(tmp_path):
     """The load-bearing one: the producer is the engine, not this file."""
-    pytest.skip(EXT_GAP)
+    pytest.skip(LIST_GAP)
     html = _engine_diagram_html()
 
     out = prerender.apply(
@@ -916,7 +919,7 @@ def test_a_diagram_from_the_installed_engine_becomes_a_picture(tmp_path):
 
 def test_the_installed_engine_still_writes_a_diagram_on_a_pre():
     """Separates the two failure modes: a new attribute, or a new tag."""
-    pytest.skip(EXT_GAP)
+    pytest.skip(LIST_GAP)
     html = _engine_diagram_html()
 
     assert html.startswith("<pre "), html

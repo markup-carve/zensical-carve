@@ -122,9 +122,12 @@ emoji = "twemoji"
 docs-dir = "docs"
 ```
 
-> The Carve 0.2 Python binding cannot register host callbacks or transforms yet
-> ([carve-py#130](https://github.com/markup-carve/carve-py/issues/130)), so on
-> this branch the old 0.1 extension names are refused until it lands.
+> `extensions` takes the Carve 0.2 standard extension names (`carve.details`,
+> `carve.mathBlock`, ...), each with its standard renderer. A 0.1 name such as
+> `details` or `math-block` is read as its 0.2 counterpart; see
+> [Which Carve features work](#which-carve-features-work).
+> Extension options are refused: the 0.2 Python binding enables an extension by
+> name only ([carve-py#142](https://github.com/markup-carve/carve-py/issues/142)).
 
 `zensical.toml` is read first - Zensical ignores a table it does not know, so
 the Carve settings sit next to the rest of the site's configuration - and
@@ -317,8 +320,7 @@ Core Carve works out of the box: rendering goes through [`carve-lang`][carve-lan
 the PyO3 binding over the Rust engine, so a page here renders exactly as `carve`
 on the command line renders it.
 
-Carve's Tier-2 and Tier-3 extensions are **off unless you enable them** (and on
-this branch cannot be enabled yet, see carve-py#130), which is
+Carve's Tier-2 and Tier-3 extensions are **off unless you enable them**, which is
 the spec's own default and not a choice this plugin makes. Which ones you want is
 a project question, so nothing is turned on for you:
 
@@ -326,7 +328,40 @@ a project question, so nothing is turned on for you:
 zensical-carve prepare --extension fenced-render --extension details
 ```
 
-`carve.extensions()` lists all 32 names. The sets below are starting points.
+The names below are the 0.1 spellings; each is read as its Carve 0.2 standard
+extension, and the 0.2 name works as well:
+
+| 0.1 name | 0.2 extension |
+| --- | --- |
+| `details` | `carve.details` |
+| `spoiler` | `carve.spoiler`, `carve.spoilerBlock` |
+| `tabs` | `carve.tabs` |
+| `code-group` | `carve.codeGroup` |
+| `code-callouts` | `carve.codeCallouts` |
+| `list-table` | `carve.listTable` |
+| `math-block` | `carve.mathBlock` |
+| `fenced-render` | `carve.fencedRender.mermaid` |
+| `fenced-render-<word>` | `carve.fencedRender.<word>` |
+| `semantic-span` | `carve.semanticSpan` |
+| `smart-quotes` | `carve.smartQuotes` |
+| `color-swatch` | `carve.colorSwatch` |
+| `wikilinks` | `carve.wiki` |
+| `citations` | `carve.references` |
+| `glossary` | `carve.glossary` |
+| `index` | `carve.index` |
+| `img-fence` | `carve.imgFence.img`, `carve.imgFence.image` |
+| `tab-normalize` | `carve.tabNormalize` |
+
+The 0.2 engine has no `heading-permalinks`, `heading-numbers`,
+`heading-level-shift`, `heading-reference`, `table-of-contents`, `toc`,
+`external-links` or `autolink` yet
+([carve-rs#4476](https://github.com/markup-carve/carve-rs/issues/4476)); naming
+one is an error. In an included file an extension claims its construct only when
+the including page uses that extension too
+([carve-rs#4481](https://github.com/markup-carve/carve-rs/issues/4481)).
+`carve.extensions()` lists only five of the names
+([carve-py#140](https://github.com/markup-carve/carve-py/issues/140)). The sets
+below are starting points.
 
 ### The Material-parity set
 

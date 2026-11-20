@@ -8,7 +8,7 @@ from pathlib import Path
 import pytest
 
 #: The Carve 0.2 engine cannot register extensions yet.
-EXT_GAP = "0.1 extension behavior awaits markup-carve/carve-py#130 and markup-carve/carve-rs#4342"
+PERMALINK_GAP = "the 0.2 engine has no heading permalinks yet (markup-carve/carve-rs#4476)"
 
 import zensical_carve
 from zensical_carve import CarveError, config, preprocess
@@ -191,7 +191,7 @@ def test_the_symbol_map_reaches_an_included_child(site):
 
 
 def test_the_extension_set_reaches_an_included_child(site):
-    pytest.skip(EXT_GAP)
+    pytest.skip(PERMALINK_GAP)
     (site / "docs" / "sub" / "frag.crv").write_text("# Child\n", encoding="utf-8")
     root = str((site / "docs").resolve())
     text = _convert(
