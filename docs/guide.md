@@ -59,8 +59,7 @@ Settings may live in `[tool.zensical-carve]` inside `zensical.toml` or
 > `details` or `math-block` is read as its 0.2 counterpart; see
 > [Which Carve features work](reference.md#which-carve-features-work).
 > An entry `{ name = { option = value } }` passes that extension's options to
-> the engine as written. The navigation extensions take no options yet
-> ([carve-py#145](https://github.com/markup-carve/carve-py/issues/145)).
+> the engine as written, including navigation extension options.
 
 
 ```toml

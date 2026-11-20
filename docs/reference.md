@@ -127,8 +127,7 @@ docs-dir = "docs"
 > `details` or `math-block` is read as its 0.2 counterpart; see
 > [Which Carve features work](#which-carve-features-work).
 > An entry `{ name = { option = value } }` passes that extension's options to
-> the engine as written. The navigation extensions take no options yet
-> ([carve-py#145](https://github.com/markup-carve/carve-py/issues/145)).
+> the engine as written, including navigation extension options.
 
 `zensical.toml` is read first - Zensical ignores a table it does not know, so
 the Carve settings sit next to the rest of the site's configuration - and

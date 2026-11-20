@@ -411,8 +411,7 @@ def test_an_unknown_option_is_refused_by_the_engine():
         render("x\n", extensions=["wikilinks"], extension_options={"wikilinks": {"url_template": "/w/{}"}})
 
 
-def test_navigation_extension_options_wait_on_the_binding():
-    pytest.skip("carve-py next2 refuses navigation extension options (markup-carve/carve-py#145)")
+def test_navigation_extension_options_reach_the_binding():
     html = render("# Hi\n", extensions=["heading-permalinks"], extension_options={"heading-permalinks": {"symbol": "#"}})
     assert ">#</a>" in html
 
