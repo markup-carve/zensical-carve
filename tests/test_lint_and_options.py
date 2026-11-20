@@ -380,7 +380,6 @@ def test_the_extension_set_reaches_the_include_path(tmp_path):
 
 
 def test_the_extension_set_reaches_an_included_page_alone(tmp_path):
-    pytest.skip("markup-carve/carve-rs#4481")
     (tmp_path / "frag.crv").write_text(DETAILS, encoding="utf-8")
     html = render(
         "{{ frag.crv }}\n",
