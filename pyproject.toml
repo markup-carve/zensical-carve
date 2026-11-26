@@ -24,8 +24,8 @@ classifiers = [
   "Topic :: Text Processing :: Markup",
 ]
 dependencies = [
-  # The Carve engine (the PyO3 binding over carve-rs). On `next2` it is the
-  # unreleased Carve 0.2 binding, pinned to a carve-py `next2` commit and built
+  # The Carve engine (the PyO3 binding over carve-rs). On `main` it is the
+  # unreleased Carve 0.2 binding, pinned to a carve-py `main` commit and built
   # from source (Rust and maturin are needed). A direct-URL dependency cannot be
   # published to PyPI, so this branch is not releasable until carve-lang 0.2 is.
   "carve-lang @ git+https://github.com/markup-carve/carve-py@8444f42cb4c2a73517be9781144f57d8fff5960d",
@@ -48,7 +48,7 @@ Carve = "https://markup-carve.github.io/carve/"
 [project.scripts]
 zensical-carve = "zensical_carve.preprocess:main"
 
-# The next2 engine pin is a git URL (see `dependencies`).
+# The 0.2 engine pin is a git URL (see `dependencies`).
 [tool.hatch.metadata]
 allow-direct-references = true
 
