@@ -1,6 +1,6 @@
 # zensical-carve
 
-Zensical integration for Carve blocks and `.crv` pages, using the Carve 0.2 engine from carve-py `next2` (unreleased). It renders complete pages before the Zensical build. Read the [Carve documentation](https://markup-carve.github.io/carve/) for the language syntax.
+Zensical integration for Carve blocks and `.crv` pages, using the Carve 0.2 engine from carve-py `main` (unreleased). It renders complete pages before the Zensical build. Read the [Carve documentation](https://markup-carve.github.io/carve/) for the language syntax.
 
 ## Install
 
@@ -8,7 +8,7 @@ Zensical integration for Carve blocks and `.crv` pages, using the Carve 0.2 engi
 pip install zensical-carve
 ```
 
-On this branch the Carve engine is a carve-py `next2` commit that pip builds from source, which needs Rust 1.88 or newer.
+On this branch the Carve engine is a carve-py `main` commit that pip builds from source, which needs Rust 1.88 or newer.
 
 ## Usage
 
