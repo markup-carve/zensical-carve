@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-11-27
+
 ### Changed
 
 - Port to Carve 0.2: pages, fences and lint go through the carve-py `next2`
@@ -14,8 +16,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `UPGRADING.md`).
 - Raw HTML is escaped by default; the new `allow-raw-html` setting (and
   `--allow-raw-html`) emits it verbatim.
-- A configured extension is refused until the engine can register extensions
-  (markup-carve/carve-rs#4329).
+- `extensions` takes the 0.2 standard extension names (`carve.details`,
+  `carve.fencedRender.graphviz`, `carve.toc`, ...) and maps the 0.1 names to
+  them, with `toc` as the `::: toc` placement. Extensions reach the page render,
+  included pages and lint, and extension options such as the permalink `symbol`
+  apply (#54, #55, #56).
+- Requires pygments-carve 0.2, the Carve 0.2 lexer, for `carve` and `crv`
+  fences.
 - Include warnings name the cause (`include-not-found`, `include-outside-root`,
   ...) instead of one `include-unresolved`. Lint lines for included files drop
   the "(included at ...)" suffix; without includes, lint reports each directive
