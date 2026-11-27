@@ -63,6 +63,22 @@ def _is_diff(text: str, pre_attrs: dict[str, str], pre_start: int) -> bool:
     return bool(figure) and "diff" in _attrs(figure.group("attrs")).get("class", "").split()
 
 
+def _code_attrs(text: str, pre_attrs: dict[str, str], pre_start: int) -> dict[str, str]:
+    """Include options placed on the figure around a captioned block."""
+    figure_start = text.rfind("<figure", 0, pre_start)
+    figure = _FIGURE_OPEN.fullmatch(text, figure_start, pre_start) if figure_start >= 0 else None
+    if not figure:
+        return pre_attrs
+    outer = _attrs(figure.group("attrs"))
+    merged = dict(pre_attrs)
+    for key in ("data-line-start", "data-highlight"):
+        if key not in merged and key in outer:
+            merged[key] = outer[key]
+    if "line-numbers" in outer.get("class", "").split():
+        merged["class"] = (merged.get("class", "") + " line-numbers").strip()
+    return merged
+
+
 def _heading_id(section_ids: list[str], attrs: dict[str, str]) -> str:
     """Carve puts the id on the section, not on the heading inside it."""
     if "id" in attrs:
@@ -92,6 +108,15 @@ def _markdown_code(pre_attrs: dict[str, str], code_attrs: dict[str, str], body: 
     options = []
     if title := pre_attrs.get("title"):
         options.append(f'title="{title}"')
+    start = pre_attrs.get("data-line-start", "1")
+    if not re.fullmatch(r"[1-9][0-9]*", start):
+        start = "1"
+    if "line-numbers" in pre_attrs.get("class", "").split():
+        options.append(f'linenums="{start}"')
+    highlight = pre_attrs.get("data-highlight", "")
+    valid_highlight = bool(re.fullmatch(r"[1-9][0-9]*(?:-[1-9][0-9]*)?(?:,[1-9][0-9]*(?:-[1-9][0-9]*)?)*", highlight))
+    if valid_highlight:
+        options.append(f'hl_lines="{highlight.replace(",", " ")}"')
 
     source = html.unescape(body)
     if language == "tsv":
@@ -99,8 +124,15 @@ def _markdown_code(pre_attrs: dict[str, str], code_attrs: dict[str, str], body: 
         # Highlight the original body with the same Pymdownx highlighter here.
         from pymdownx.highlight import Highlight
 
+        lines = []
+        if valid_highlight:
+            for part in highlight.split(","):
+                ends = [int(value) for value in part.split("-")]
+                lines.extend(range(ends[0], min(ends[-1], source.count("\n") + 1) + 1))
         return "\n\n" + Highlight(None, pygments_lang_class=True).highlight(
-            source, language, title=pre_attrs.get("title")
+            source, language, title=pre_attrs.get("title"),
+            linestart=int(start) if "line-numbers" in pre_attrs.get("class", "").split() else -1,
+            hl_lines=lines,
         ) + "\n\n"
     # A fence must be longer than any backtick run inside the payload.
     longest = max((len(run) for run in re.findall(r"`+", source)), default=0)
@@ -212,7 +244,7 @@ def adapt(carve_html: str) -> str:
             )
         else:
             body = match.group("body")
-            pre_attrs = _attrs(match.group("pre_attrs"))
+            pre_attrs = _code_attrs(out, _attrs(match.group("pre_attrs")), match.start())
             code_attrs = _attrs(match.group("code_attrs"))
             if _INJECTED_MARKUP.search(body):
                 # An extension has already put ELEMENTS inside this code block -
