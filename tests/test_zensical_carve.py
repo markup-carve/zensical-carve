@@ -332,6 +332,26 @@ def test_an_ordinary_code_block_with_escaped_angle_brackets_still_fences():
     assert "if (a < b) {}" in out
 
 
+@pytest.mark.parametrize("captioned", [False, True])
+def test_code_line_options_reach_superfences(captioned):
+    from zensical_carve.theme import adapt
+
+    block = '<pre class="line-numbers" data-line-start="42" data-highlight="1,3-5"><code class="language-php">a\nb\n</code></pre>'
+    if captioned:
+        block = '<figure class="line-numbers" data-line-start="42" data-highlight="1,3-5">\n' + block.replace(' class="line-numbers" data-line-start="42" data-highlight="1,3-5"', '', 1) + '\n<figcaption>Sample</figcaption></figure>'
+    out = adapt(block)
+    assert 'linenums="42"' in out
+    assert 'hl_lines="1 3-5"' in out
+
+
+def test_invalid_code_line_options_fall_back():
+    from zensical_carve.theme import adapt
+
+    out = adapt('<pre class="line-numbers" data-line-start="auto" data-highlight="1,no"><code>x</code></pre>')
+    assert 'linenums="1"' in out
+    assert 'hl_lines=' not in out
+
+
 def test_a_deeply_indented_tag_is_left_aligned_even_when_the_chunk_starts_at_zero():
     """A four-space indent is a code block, and a common-prefix dedent misses it.
 
