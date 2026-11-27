@@ -45,3 +45,5 @@
 # `tests/test_rendering_rulings.py` is what gives the canary something to fail
 # on.
 carve-lang @ git+https://github.com/markup-carve/carve-py@8444f42cb4c2a73517be9781144f57d8fff5960d
+# pygments-carve 0.2.0 is not on PyPI yet; this is its release cut.
+pygments-carve @ git+https://github.com/markup-carve/pygments-carve@df183ae9c471c3a32fdc76c50bf2ef5a0d1a80a8
